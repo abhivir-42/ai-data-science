@@ -1,0 +1,31 @@
+id,name,age,income,education,city,is_customer,join_date,satisfaction_score
+1,John Smith,32,75000,Bachelor,New York,True,2022-01-15,4.5
+2,Maria Garcia,45,92000,Master,Los Angeles,True,2020-05-22,4.8
+3,Robert Johnson,29,,PhD,Chicago,True,2021-09-10,4.2
+4,,51,68000,Bachelor,Houston,False,2019-12-05,3.7
+5,Emily Wilson,36,79500,Master,Phoenix,True,2022-03-18,4.6
+6,Michael Brown,42,NaN,High School,Philadelphia,False,2018-07-30,2.9
+7,Jessica Martinez,27,63000,Bachelor,San Antonio,True,2021-11-05,4.1
+8,David Thompson,55,115000,PhD,San Diego,True,2017-04-12,4.9
+9,Jennifer Davis,38,82000,Master,Dallas,True,2020-08-23,4.3
+10,Christopher Wilson,47,NaN,Bachelor,San Jose,False,2019-02-28,3.5
+11,Amanda Thomas,33,77500,Master,Austin,True,2022-02-09,4.7
+12,James Rodriguez,49,98000,PhD,Jacksonville,True,2018-11-17,4.4
+13,Sarah Martinez,31,71000,Bachelor,San Francisco,True,2021-06-25,4.0
+14,Daniel White,44,NaN,High School,Indianapolis,False,2019-10-08,3.2
+15,Lisa Johnson,39,84500,Master,Columbus,True,2020-07-14,4.5
+16,Robert Smith,32,75000,Bachelor,New York,True,2022-01-15,4.5
+17,Paul Harris,NaN,62000,Associate,Fort Worth,True,2021-04-30,3.8
+18,Michelle Lee,37,80000,Master,Charlotte,True,2020-09-11,4.4
+19,William Davis,52,105000,PhD,Seattle,True,2017-08-27,4.8
+20,Jennifer White,34,NaN,Bachelor,Denver,False,2019-05-19,3.6
+21,John Thompson,46,93500,Master,Washington,True,2018-12-02,4.2
+22,Maria Thomas,28,67000,Bachelor,Boston,True,2021-10-16,4.0
+23,James Wilson,53,110000,PhD,Nashville,True,2016-11-30,4.9
+24,Emily Rodriguez,40,NaN,High School,El Paso,False,2019-03-25,3.3
+25,David Johnson,35,78000,Master,Portland,True,2020-06-21,4.6
+26,John Smith,32,75000,Bachelor,New York,True,2022-01-15,4.5
+27,Sarah Thompson,NaN,64500,Associate,Oklahoma City,True,2021-05-03,3.9
+28,Michael Garcia,43,89000,Master,Las Vegas,True,2019-09-08,4.3
+29,Jessica Davis,30,69500,Bachelor,Louisville,True,2021-07-19,4.1
+30,Christopher Martinez,48,NaN,High School,Milwaukee,False,2018-04-14,3.0 
