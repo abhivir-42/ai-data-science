@@ -594,11 +594,11 @@ def make_data_cleaning_agent(
     prompt_text_human_review = "Are the following data cleaning instructions correct? (Answer 'yes' or provide modifications)\n{steps}"
     
     if not bypass_explain_code:
-        def human_review(state: GraphState) -> Command[Literal["recommend_cleaning_steps", "explain_data_cleaner_code"]]:
+        def human_review(state: GraphState) -> Command[Literal["recommend_cleaning_steps", "report_agent_outputs"]]:
             return node_func_human_review(
                 state=state,
                 prompt_text=prompt_text_human_review,
-                yes_goto= 'explain_data_cleaner_code',
+                yes_goto='report_agent_outputs',
                 no_goto="recommend_cleaning_steps",
                 user_instructions_key="user_instructions",
                 recommended_steps_key="recommended_steps",
