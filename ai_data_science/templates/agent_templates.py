@@ -539,7 +539,12 @@ def create_coding_agent_graph(
     )
     
     # Update retry count before executing code again
-    workflow.add_edge(fix_code_node_name, increment_retry_count, execute_code_node_name)
+    # First add the increment_retry_count node
+    workflow.add_node("increment_retry_count", increment_retry_count)
+    
+    # Connect the fix_code_node to increment_retry_count and then to execute_code_node
+    workflow.add_edge(fix_code_node_name, "increment_retry_count")
+    workflow.add_edge("increment_retry_count", execute_code_node_name)
     
     # Compile the graph
     if checkpointer:
