@@ -159,4 +159,23 @@ def get_generic_summary(data: dict) -> str:
     if "data_cleaner_error" in data and data["data_cleaner_error"]:
         summary.append(f"### Errors\n{data['data_cleaner_error']}")
     
-    return "\n\n".join(summary) 
+    return "\n\n".join(summary)
+
+def remove_language_tags(text: str) -> str:
+    """
+    Remove language tags like ```python and ``` from code blocks.
+    
+    Parameters
+    ----------
+    text : str
+        The text containing code blocks with language tags.
+        
+    Returns
+    -------
+    str
+        Text with language tags removed.
+    """
+    # Remove opening language tags like ```python, ```json, etc.
+    text = re.sub(r'```\w+\n', '```\n', text)
+    
+    return text 
