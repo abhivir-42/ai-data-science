@@ -1,10 +1,12 @@
 """
-Adapters for AI Data Science agents.
+Adapters for AI Data Science.
 
-This package provides adapters to convert AI Data Science agents to 
-work with other frameworks, such as Fetch.ai's uAgents system.
+This package provides adapters for integrating AI Data Science with external systems.
 """
 
-from ai_data_science.adapters.uagents_adapter import DataCleaningAgentAdapter, DataLoaderToolsAgentAdapter
+from src.adapters.uagents_adapter import DataCleaningAgentAdapter, DataLoaderToolsAgentAdapter
 
-__all__ = ["DataCleaningAgentAdapter", "DataLoaderToolsAgentAdapter"] 
+__all__ = [
+    "DataCleaningAgentAdapter",
+    "DataLoaderToolsAgentAdapter"
+] 
