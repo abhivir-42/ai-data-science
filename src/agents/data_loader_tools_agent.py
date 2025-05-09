@@ -9,19 +9,21 @@ from typing import Any, Optional, Annotated, Sequence, List, Dict
 import operator
 import pandas as pd
 import os
+import json
+from pprint import pformat
 
 from IPython.display import Markdown
 
-from langchain_core.messages import BaseMessage, AIMessage
+from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, ToolMessage
 
 from langgraph.prebuilt import create_react_agent, ToolNode
 from langgraph.prebuilt.chat_agent_executor import AgentState
 from langgraph.types import Checkpointer
 from langgraph.graph import START, END, StateGraph
 
-from ai_data_science.templates import BaseAgent
-from ai_data_science.utils.regex import format_agent_name
-from ai_data_science.tools import (
+from src.templates import BaseAgent
+from src.utils.regex import format_agent_name
+from src.tools import (
     load_file,
     load_directory,
     list_directory_contents,
@@ -29,7 +31,7 @@ from ai_data_science.tools import (
     get_file_info,
     search_files_by_pattern,
 )
-from ai_data_science.utils.messages import get_tool_call_names
+from src.utils.messages import get_tool_call_names
 
 # Setup
 AGENT_NAME = "data_loader_tools_agent"
@@ -351,9 +353,12 @@ def make_data_loader_tools_agent(
             **create_react_agent_kwargs,
         )
         
+        # Create a user message from instructions
+        user_message = HumanMessage(content=state["user_instructions"])
+        
         response = data_loader_agent.invoke(
             {
-                "messages": [("user", state["user_instructions"])],
+                "messages": [user_message],
             },
             **invoke_react_agent_kwargs,
         )
@@ -371,23 +376,76 @@ def make_data_loader_tools_agent(
             }
 
         # Get the last AI message
-        last_ai_message = AIMessage(internal_messages[-1].content, role=AGENT_NAME)
+        last_ai_message = None
+        for msg in reversed(internal_messages):
+            if isinstance(msg, AIMessage):
+                last_ai_message = msg
+                break
+        
+        if last_ai_message is None:
+            last_ai_message = AIMessage(content="No AI response was generated.", role=AGENT_NAME)
 
-        # Get the last tool artifact safely
+        # Find and extract tool artifacts directly from tool messages
         last_tool_artifact = None
-        for message in reversed(internal_messages):
-            if hasattr(message, "additional_kwargs") and "artifact" in message.additional_kwargs:
-                last_tool_artifact = message.additional_kwargs["artifact"]
-                break
-            elif hasattr(message, "artifact"):
-                last_tool_artifact = message.artifact
-                break
-            elif isinstance(message, dict) and "artifact" in message:
-                last_tool_artifact = message["artifact"]
-                break
+        
+        # Print message types for debugging
+        print(f"    * Message types: {[type(msg).__name__ for msg in internal_messages]}")
+        
+        # Extract data directly from ToolMessage objects
+        for msg in internal_messages:
+            if isinstance(msg, ToolMessage):
+                if msg.name in ["load_file", "load_directory"]:
+                    # Try to parse the content if it's a string
+                    if isinstance(msg.content, str):
+                        try:
+                            content_dict = json.loads(msg.content)
+                            if isinstance(content_dict, dict) and "data" in content_dict:
+                                last_tool_artifact = content_dict
+                                print(f"    * Found data in tool message: {msg.name}")
+                                break
+                        except:
+                            pass
+                    # If content is already a dict
+                    elif isinstance(msg.content, dict) and "data" in msg.content:
+                        last_tool_artifact = msg.content
+                        print(f"    * Found data in tool message: {msg.name}")
+                        break
 
         # Extract tool calls from the messages
         tool_calls = get_tool_call_names(internal_messages)
+        
+        # If still no artifact but load tools were called, try to reconstruct
+        if last_tool_artifact is None and ("load_file" in tool_calls or "load_directory" in tool_calls):
+            print("    * WARNING: Data loading tool was called but no artifact found in messages")
+            
+            # Try direct tool execution as fallback
+            for msg in internal_messages:
+                if isinstance(msg, ToolMessage) and msg.name == "load_file":
+                    # Extract arguments and call tool directly
+                    try:
+                        if hasattr(msg, "input") and isinstance(msg.input, dict) and "file_path" in msg.input:
+                            file_path = msg.input["file_path"]
+                            print(f"    * Directly loading file: {file_path}")
+                            result = load_file(file_path)
+                            if isinstance(result, dict) and "data" in result:
+                                last_tool_artifact = result
+                                print(f"    * Successfully loaded file directly")
+                                break
+                    except Exception as e:
+                        print(f"    * Error loading file directly: {e}")
+        
+        # Create a useful error message if data loading failed
+        if last_tool_artifact is None and ("load_file" in tool_calls or "load_directory" in tool_calls):
+            print("    * Creating empty data structure as fallback")
+            # Create a minimal structure to avoid errors
+            last_tool_artifact = {
+                "data": [],
+                "file_info": {
+                    "path": "unknown",
+                    "name": "unknown",
+                    "error": "Data loading failed - artifact not found in messages"
+                }
+            }
         
         return {
             "messages": [last_ai_message], 
