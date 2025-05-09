@@ -12,8 +12,8 @@ from typing import Dict, Any, Optional
 
 from langchain_core.language_models import BaseLanguageModel
 
-from ai_data_science.agents.data_cleaning_agent import DataCleaningAgent
-from ai_data_science.agents.data_loader_tools_agent import DataLoaderToolsAgent
+from src.agents.data_cleaning_agent import DataCleaningAgent
+from src.agents.data_loader_tools_agent import DataLoaderToolsAgent
 
 
 class DataCleaningAgentAdapter:
