@@ -5,8 +5,8 @@ This package provides tools for data processing, data loading, and other
 operations used by the AI Data Science agents.
 """
 
-from ai_data_science.tools.dataframe import get_dataframe_summary
-from ai_data_science.tools.data_loader import (
+from src.tools.dataframe import get_dataframe_summary
+from src.tools.data_loader import (
     load_file,
     load_directory,
     list_directory_contents,
