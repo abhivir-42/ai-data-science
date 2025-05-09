@@ -33,9 +33,16 @@ def log_ai_function(response: str, file_name: str = None, log: bool = False, log
         
     if not log_path:
         log_path = "logs"
-        
+    
+    # Remove redundant path components - avoid logs/logs/file.py
+    if log_path.startswith("logs") and os.path.join(os.getcwd(), "logs") == os.path.abspath(log_path):
+        log_path = "logs"
+    elif os.path.basename(log_path) == "logs" and os.path.dirname(log_path) == "logs":
+        log_path = "logs"
+    
+    # Ensure the logs directory exists
     if not os.path.exists(log_path):
-        os.makedirs(log_path)
+        os.makedirs(log_path, exist_ok=True)
         
     if not file_name:
         file_name = f"ai_function_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
@@ -50,6 +57,9 @@ def log_ai_function(response: str, file_name: str = None, log: bool = False, log
         unique_id = str(uuid.uuid4())[:8]
         file_name = f"{base_name}_{unique_id}{ext}"
         file_path = os.path.join(log_path, file_name)
+    
+    # Create directory if it doesn't exist (handles nested paths)
+    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
     
     with open(file_path, 'w') as f:
         f.write(response)
