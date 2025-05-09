@@ -133,11 +133,15 @@ def main():
     print_step("Running data cleaning agent")
     cleaning_instructions = """
     Please clean this housing dataset by:
-    1. Handling missing values in a way that preserves as much data as possible
-    2. Removing extreme outliers that would skew analysis
-    3. Converting categorical variables appropriately
-    4. Ensuring all data types are appropriate
-    5. Adding helpful comments in the code explaining each cleaning step
+    1. Handling missing values - DO NOT REMOVE ROWS with missing values, instead:
+       - For numeric columns: replace missing values with the column mean
+       - For categorical columns: replace missing values with the most common value
+    2. Converting categorical variables to appropriate representation
+    3. Ensuring all data types are appropriate
+    4. Removing only extreme outliers that would skew analysis (use 3x IQR or greater threshold)
+    5. Handling any issues with specific columns (based on your analysis)
+    6. IMPORTANT: Use data.loc[] for all assignments to avoid SettingWithCopyWarning
+    7. Add helpful comments in the code explaining each cleaning step
     """
     print(f"Cleaning instructions: {cleaning_instructions}")
     
@@ -169,6 +173,16 @@ def main():
             return
             
         print(f"Cleaned data shape: {cleaned_df.shape}")
+        print(f"Original data shape: {df.shape}")
+        
+        if cleaned_df.shape[0] < df.shape[0] * 0.9:
+            print_warning(f"WARNING: Cleaned data has significantly fewer rows ({cleaned_df.shape[0]}) than original ({df.shape[0]})")
+            print_warning("This suggests that rows with missing values may have been removed despite instructions")
+            
+        if cleaned_df.shape[1] > df.shape[1] * 1.5:
+            print_warning(f"WARNING: Cleaned data has significantly more columns ({cleaned_df.shape[1]}) than original ({df.shape[1]})")
+            print_warning("This suggests one-hot encoding or other transformations that expanded the dataset")
+        
         print("\nFirst 5 rows of cleaned data:")
         print(cleaned_df.head())
         
