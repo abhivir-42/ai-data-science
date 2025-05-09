@@ -19,7 +19,7 @@ from langgraph.types import Command
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Checkpointer
 
-from ai_data_science.templates import(
+from src.templates import(
     node_func_execute_agent_code_on_data, 
     node_func_human_review,
     node_func_fix_agent_code, 
@@ -27,16 +27,16 @@ from ai_data_science.templates import(
     create_coding_agent_graph,
     BaseAgent,
 )
-from ai_data_science.parsers.parsers import PythonOutputParser
-from ai_data_science.utils.regex import (
+from src.parsers.parsers import PythonOutputParser
+from src.utils.regex import (
     relocate_imports_inside_function, 
     add_comments_to_top, 
     format_agent_name, 
     format_recommended_steps, 
     get_generic_summary,
 )
-from ai_data_science.tools.dataframe import get_dataframe_summary
-from ai_data_science.utils.logging import log_ai_function
+from src.tools.dataframe import get_dataframe_summary
+from src.utils.logging import log_ai_function
 
 # Setup
 AGENT_NAME = "data_cleaning_agent"
