@@ -77,9 +77,12 @@ def main():
         data_raw=df,
         user_instructions="""
         Clean this dataset by:
-        1. Handling missing values (replace with mean or other appropriate value)
-        2. Removing age outliers (normal human age range)
+        1. Handling missing values - DO NOT REMOVE ROWS with missing values, instead:
+           - Replace numeric missing values with the column mean
+           - Replace categorical missing values with the column mode/most frequent value
+        2. Removing age outliers (normal human age range is typically 0-100)
         3. Ensuring consistent data types
+        4. Add detailed comments in your code for each cleaning step
         """,
         max_retries=2
     )
