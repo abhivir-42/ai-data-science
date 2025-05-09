@@ -313,9 +313,9 @@ def node_func_fix_agent_code(
     Dict[str, Any]
         The updated state with fixed code.
     """
-    from ai_data_science.utils.regex import relocate_imports_inside_function, add_comments_to_top
-    from ai_data_science.utils.logging import log_ai_function
-    from ai_data_science.parsers.parsers import PythonOutputParser
+    from src.utils.regex import relocate_imports_inside_function, add_comments_to_top
+    from src.utils.logging import log_ai_function
+    from src.parsers.parsers import PythonOutputParser
     
     print(f"    * FIX AGENT CODE")
     
