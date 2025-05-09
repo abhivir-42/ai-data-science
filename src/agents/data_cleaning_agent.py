@@ -12,6 +12,7 @@ import os
 import json
 import pandas as pd
 from IPython.display import Markdown
+import numpy as np
 
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import BaseMessage
@@ -279,9 +280,54 @@ Function Name: {self.response.get('data_cleaner_function_name')}
     def get_data_cleaned(self):
         """
         Retrieves the cleaned data stored after running invoke_agent or clean_data methods.
+        
+        Returns:
+            pd.DataFrame: The cleaned DataFrame, or None if no data is available.
+        
+        Raises:
+            ValueError: If there are issues converting the data to a DataFrame.
         """
-        if self.response:
-            return pd.DataFrame(self.response.get("data_cleaned"))
+        if not self.response:
+            return None
+            
+        try:
+            data_cleaned = self.response.get("data_cleaned")
+            if data_cleaned is None:
+                return None
+                
+            # Handle different possible formats
+            if isinstance(data_cleaned, pd.DataFrame):
+                return data_cleaned
+            elif isinstance(data_cleaned, dict):
+                # Check if it's a dict of Series or dict of lists/values
+                if data_cleaned and all(isinstance(v, (pd.Series, list, tuple, np.ndarray)) for v in data_cleaned.values()):
+                    return pd.DataFrame(data_cleaned)
+                # Handle the case where it's a dict of dicts (records format)
+                elif data_cleaned and all(isinstance(v, dict) for v in data_cleaned.values()):
+                    return pd.DataFrame.from_records(list(data_cleaned.values()))
+            
+            # If we got here, the format is unexpected - try more conversion approaches
+            try:
+                # Try parsing as records
+                return pd.DataFrame.from_records(data_cleaned)
+            except:
+                try:
+                    # Last resort - convert to string and back to evaluate structure
+                    import json
+                    json_str = json.dumps(data_cleaned)
+                    parsed = json.loads(json_str)
+                    if isinstance(parsed, list):
+                        return pd.DataFrame(parsed)
+                    return pd.DataFrame(parsed)
+                except:
+                    raise ValueError(f"Could not convert cleaned data to DataFrame. Data format: {type(data_cleaned)}")
+        except Exception as e:
+            import traceback
+            print(f"Error in get_data_cleaned: {str(e)}")
+            print(traceback.format_exc())
+            # Return a simple DataFrame with the error message for debugging
+            return pd.DataFrame({"error": [str(e)], "data_type": [str(type(self.response.get("data_cleaned")))], 
+                                "response_keys": [list(self.response.keys())]})
         
     def get_data_raw(self):
         """
@@ -617,6 +663,64 @@ def make_data_cleaning_agent(
             )
     
     def execute_data_cleaner_code(state):
+        """Execute the data cleaner code on the raw data.
+        
+        This function handles the conversion of data between formats and captures any errors.
+        """
+        print("    * EXECUTE AGENT CODE")
+        
+        # Define a more robust post-processing function
+        def robust_post_processing(result):
+            """Safely convert the result to a dictionary format compatible with pandas."""
+            try:
+                # If result is already a DataFrame, convert to dict
+                if isinstance(result, pd.DataFrame):
+                    return result.to_dict()
+                # If it's a dict, ensure it has the right structure
+                elif isinstance(result, dict):
+                    # Check if all values have the same length
+                    if result and all(isinstance(v, (list, tuple, np.ndarray)) for v in result.values()):
+                        # Check if all lists have the same length
+                        lengths = [len(v) for v in result.values() if hasattr(v, '__len__')]
+                        if lengths and all(l == lengths[0] for l in lengths):
+                            return result
+                    
+                    # If dict of dicts (records format), convert to columnar format
+                    if result and all(isinstance(v, dict) for v in result.values()):
+                        columnar_dict = {}
+                        for record_id, record in result.items():
+                            for col, val in record.items():
+                                if col not in columnar_dict:
+                                    columnar_dict[col] = []
+                                columnar_dict[col].append(val)
+                        return columnar_dict
+                    
+                    # If it's just a dict but not in the right format, try a conversion approach
+                    try:
+                        df = pd.DataFrame.from_dict(result, orient='index')
+                        return df.to_dict(orient='list')
+                    except:
+                        pass
+                
+                # If we got here, try to convert to DataFrame and then to dict
+                try:
+                    df = pd.DataFrame(result)
+                    return df.to_dict()
+                except:
+                    # Last resort - convert to string and back to evaluate structure
+                    import json
+                    try:
+                        json_str = json.dumps(result)
+                        parsed = json.loads(json_str)
+                        df = pd.DataFrame(parsed)
+                        return df.to_dict()
+                    except:
+                        # If all else fails, return the original result
+                        return result
+            except Exception as e:
+                print(f"Post-processing error: {str(e)}")
+                return result
+        
         return node_func_execute_agent_code_on_data(
             state=state,
             data_key="data_raw",
@@ -625,7 +729,7 @@ def make_data_cleaning_agent(
             code_snippet_key="data_cleaner_function",
             agent_function_name=state.get("data_cleaner_function_name"),
             pre_processing=lambda data: pd.DataFrame.from_dict(data),
-            post_processing=lambda df: df.to_dict() if isinstance(df, pd.DataFrame) else df,
+            post_processing=robust_post_processing,
             error_message_prefix="An error occurred during data cleaning: "
         )
         
