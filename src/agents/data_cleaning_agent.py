@@ -301,7 +301,21 @@ Function Name: {self.response.get('data_cleaner_function_name')}
             elif isinstance(data_cleaned, dict):
                 # Check if it's a dict of Series or dict of lists/values
                 if data_cleaned and all(isinstance(v, (pd.Series, list, tuple, np.ndarray)) for v in data_cleaned.values()):
-                    return pd.DataFrame(data_cleaned)
+                    df = pd.DataFrame(data_cleaned)
+                    # Ensure we don't have duplicate columns from one-hot encoding or other transformations
+                    if df.shape[1] > 3 * len(self.response.get("data_raw", {}).keys()):
+                        # This likely means we have a format issue - try to convert from records
+                        try:
+                            # Try reconstructing from original columns and limiting to reasonable size
+                            orig_cols = set(self.response.get("data_raw", {}).keys())
+                            if len(orig_cols) > 0:
+                                # Filter columns to those that make sense
+                                valid_cols = [c for c in df.columns if any(oc in str(c) for oc in orig_cols) or not any(str(i) in str(c) for i in range(10))]
+                                if len(valid_cols) > 0:
+                                    df = df[valid_cols]
+                        except:
+                            pass
+                    return df
                 # Handle the case where it's a dict of dicts (records format)
                 elif data_cleaned and all(isinstance(v, dict) for v in data_cleaned.values()):
                     return pd.DataFrame.from_records(list(data_cleaned.values()))
@@ -596,13 +610,27 @@ def make_data_cleaning_agent(
             def {function_name}(data_raw):
                 import pandas as pd
                 import numpy as np
-                ...
-                return data_cleaned
+                # Disable SettingWithCopyWarning temporarily for clean code
+                pd.set_option('mode.chained_assignment', None)
+                
+                # Make a copy of the data to avoid warnings
+                data = data_raw.copy()
+                
+                # Your cleaning code here
+                
+                # Re-enable warnings before returning
+                pd.set_option('mode.chained_assignment', 'warn')
+                
+                return data
 
             Best Practices and Error Preventions:
-
-            Always ensure that when assigning the output of fit_transform() from SimpleImputer to a Pandas DataFrame column, you call .ravel() or flatten the array, because fit_transform() returns a 2D array while a DataFrame column is 1D.
-            
+            1. Always use data.loc[] for assignments rather than chained indexing to avoid SettingWithCopyWarning
+            2. When replacing values, use data.loc[] syntax: data.loc[mask, 'column'] = value
+            3. When instructed to replace missing values with mean/median, use explicit assignment rather than fillna
+            4. Always make a copy of the dataframe before modifying it
+            5. Always ensure that when assigning the output of fit_transform() from SimpleImputer to a Pandas DataFrame column, you call .ravel() or flatten the array, because fit_transform() returns a 2D array while a DataFrame column is 1D.
+            6. If asked to replace missing values instead of removing rows, make sure to honor this request and don't drop rows with missing values.
+            7. When removing outliers, be cautious not to remove too many rows. Consider using a generous threshold.
             """,
             input_variables=["recommended_steps", "all_datasets_summary", "function_name"]
         )
@@ -675,7 +703,28 @@ def make_data_cleaning_agent(
             try:
                 # If result is already a DataFrame, convert to dict
                 if isinstance(result, pd.DataFrame):
-                    return result.to_dict()
+                    # Store original shape for debugging
+                    orig_shape = result.shape
+                    # Check if the result has an unreasonable number of columns
+                    # (indicating potential one-hot encoding or other transformation issues)
+                    data_raw = pd.DataFrame.from_dict(state.get("data_raw"))
+                    if result.shape[1] > 3 * data_raw.shape[1]:
+                        print(f"Warning: Cleaned data has {result.shape[1]} columns, which is much larger than the original {data_raw.shape[1]}.")
+                        # Try to filter columns that make sense
+                        try:
+                            # Inspect column names to identify potential one-hot encoding
+                            orig_cols = set(data_raw.columns)
+                            valid_cols = [c for c in result.columns if any(oc in str(c) for oc in orig_cols) or not any(str(i) in str(c) for i in range(10))]
+                            if len(valid_cols) > 0:
+                                result = result[valid_cols]
+                                print(f"Filtered to {len(valid_cols)} relevant columns")
+                        except Exception as e:
+                            print(f"Error filtering columns: {str(e)}")
+                    
+                    # Create a copy to avoid SettingWithCopyWarning
+                    result_dict = result.copy().to_dict()
+                    return result_dict
+                    
                 # If it's a dict, ensure it has the right structure
                 elif isinstance(result, dict):
                     # Check if all values have the same length
@@ -721,6 +770,27 @@ def make_data_cleaning_agent(
                 print(f"Post-processing error: {str(e)}")
                 return result
         
+        # Define a pre-processing function that sets pandas options
+        def preprocessing_with_options(data):
+            """Convert data to DataFrame and set pandas options to avoid warnings."""
+            # Disable chained assignment warnings - will be reset after execution
+            prior_option = pd.get_option('mode.chained_assignment')
+            pd.set_option('mode.chained_assignment', None)
+            
+            # Return both the dataframe and the prior option setting for restoration
+            return (pd.DataFrame.from_dict(data), prior_option)
+        
+        # Define a post-processing wrapper that restores pandas options
+        def post_processing_wrapper(result, prior_option):
+            """Process the result and restore pandas options."""
+            # First apply the robust post-processing
+            processed_result = robust_post_processing(result)
+            
+            # Restore the pandas option
+            pd.set_option('mode.chained_assignment', prior_option)
+            
+            return processed_result
+        
         return node_func_execute_agent_code_on_data(
             state=state,
             data_key="data_raw",
@@ -728,8 +798,8 @@ def make_data_cleaning_agent(
             error_key="data_cleaner_error",
             code_snippet_key="data_cleaner_function",
             agent_function_name=state.get("data_cleaner_function_name"),
-            pre_processing=lambda data: pd.DataFrame.from_dict(data),
-            post_processing=robust_post_processing,
+            pre_processing=preprocessing_with_options,
+            post_processing=lambda result_and_option: post_processing_wrapper(result_and_option[0], result_and_option[1]),
             error_message_prefix="An error occurred during data cleaning: "
         )
         
