@@ -1,59 +1,57 @@
-# DataLoaderToolsAgent Implementation Plan
+# Implementation Plan: DataLoaderToolsAgent
 
 ## Overview
+The DataLoaderToolsAgent provides users with an AI assistant that can load and explore data files in their local file system. It's designed to handle various file formats and help with data discovery.
 
-This document outlines the implementation plan for the DataLoaderToolsAgent, which is responsible for loading data from various sources and formats based on user instructions. The agent is built using LangChain and Fetch.ai uAgents to provide a flexible and extensible data loading solution.
+## Tasks
 
-## Implementation Tasks
+### Core Agent Functionality
+- [x] Create basic agent structure with ReAct pattern
+- [x] Implement basic prompt template for the agent
+- [x] Add state management for tracking loaded data
+- [x] Implement ability to invoke the agent with instructions
 
-- [x] Create data loading tool functions
-  - [x] Implement `load_file` for loading individual data files (CSV, Excel, JSON, Parquet)
-  - [x] Implement `load_directory` for batch loading multiple files
-  - [x] Implement `list_directory_contents` for exploring file systems
-  - [x] Implement `list_directory_recursive` for deeper file system exploration
-  - [x] Implement `get_file_info` for analyzing file metadata
-  - [x] Implement `search_files_by_pattern` for finding specific files
+### Data Loading Tools
+- [x] Implement CSV file loading
+- [x] Implement JSON file loading
+- [x] Implement directory listing
+- [x] Implement file search by pattern
+- [x] Implement file info extraction
+- [x] Add support for loading multiple files
 
-- [x] Create the main DataLoaderToolsAgent class
-  - [x] Implement core agent functionality using LangChain's ReAct agent framework
-  - [x] Implement state management with AgentState for tracking agent progress
-  - [x] Set up the `make_data_loader_tools_agent` factory function
-  - [x] Implement utility methods for accessing loaded data and agent results
+### File System Navigation
+- [x] Allow navigation between directories
+- [x] Add recursive directory search
+- [x] Implement file pattern matching
+- [x] Add support for getting detailed file info
 
-- [x] Implement uAgent adapter for Fetch.ai integration
-  - [x] Create `DataLoaderToolsAgentAdapter` class
-  - [x] Implement registration method for Agentverse
-  - [x] Support API key authentication for Agentverse
-  - [x] Add helper methods for loading data through the adapter
+### User Interface
+- [x] Add methods to extract loaded data as DataFrame
+- [x] Add methods to get internal agent messages
+- [x] Add methods to view tool calls made by agent
+- [x] Create formatted output for DataFrame preview
 
-- [x] Update package structure
-  - [x] Update `__init__.py` files to expose new classes
-  - [x] Create missing utility functions like `get_tool_call_names`
-  - [x] Ensure proper imports throughout the codebase
+### Testing
+- [x] Create sample data files for testing
+- [x] Implement basic unit tests for data loader tools
+- [x] Add test script to verify agent functionality
+- [x] Ensure tests work without API key for CI/CD
 
-- [x] Create examples and documentation
-  - [x] Add example script showcasing combined DataLoaderToolsAgent and DataCleaningAgent
-  - [x] Add example script for registering both agents with Agentverse
-  - [x] Document agent usage and integration patterns
+### Integration
+- [x] Create adapter for uAgents compatibility
+- [x] Implement registration with Fetch.ai Agentverse
+- [x] Add example usage script
+- [x] Create data pipeline example with DataCleaningAgent
 
-## Integration Points
-
-- The DataLoaderToolsAgent can be used as a standalone agent or as part of a pipeline
-- Integration with DataCleaningAgent allows for complete data processing workflows
-- Fetch.ai uAgents integration enables communication with other agents in the Agentverse
-
-## Testing Strategy
-
-1. Test individual data loading tool functions with various file types
-2. Test the complete agent with simple data loading instructions
-3. Test uAgent registration and communication with Agentverse
-4. Test integration with DataCleaningAgent in a complete pipeline
+### Path Fixes and Improvements
+- [x] Fix import paths to use 'src' instead of 'ai_data_science'
+- [x] Update templates and utils to use correct imports
+- [x] Add missing regex utility functions
+- [x] Ensure all tools work with new path structure
 
 ## Next Steps
-
-- [ ] Create comprehensive test suite for all components
-- [ ] Enhance data loader tools with authentication support for cloud storage
-- [ ] Add support for streaming data sources
-- [ ] Add more examples for complex data loading scenarios
-- [ ] Create a monitoring dashboard for tracking agent operations
-- [ ] Improve error handling and recovery mechanisms 
+- [ ] Add support for more file formats (Excel, Parquet, etc.)
+- [ ] Improve error handling and retry mechanisms
+- [ ] Enhance documentation with more examples
+- [ ] Add streaming support for large files
+- [ ] Implement data validation checks during loading 
