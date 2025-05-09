@@ -11,7 +11,7 @@ import time
 import argparse
 from langchain_openai import ChatOpenAI
 
-from ai_data_science.adapters import DataCleaningAgentAdapter, DataLoaderToolsAgentAdapter
+from src.adapters import DataCleaningAgentAdapter, DataLoaderToolsAgentAdapter
 
 # Set your OpenAI API key here or use environment variable
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your-api-key")
