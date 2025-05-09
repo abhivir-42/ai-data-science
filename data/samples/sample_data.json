@@ -1,0 +1,7 @@
+[
+    {"id": 1, "name": "John Smith", "age": 34, "salary": 75000, "department": "Engineering"},
+    {"id": 2, "name": "Mary Johnson", "age": 45, "salary": 85000, "department": "Marketing"},
+    {"id": 3, "name": "James Brown", "age": 28, "salary": 65000, "department": "Engineering"},
+    {"id": 4, "name": "Patricia Davis", "age": 52, "salary": 95000, "department": "Management"},
+    {"id": 5, "name": "Robert Miller", "age": 39, "salary": 78000, "department": "Sales"}
+] 
