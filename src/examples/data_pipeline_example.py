@@ -9,7 +9,7 @@ import os
 import pandas as pd
 from langchain_openai import ChatOpenAI
 
-from ai_data_science.agents import DataLoaderToolsAgent, DataCleaningAgent
+from src.agents import DataLoaderToolsAgent, DataCleaningAgent
 
 # Set your OpenAI API key here or use environment variable
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "your-api-key")
