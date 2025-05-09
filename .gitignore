@@ -56,3 +56,11 @@ logs/
 
 # OS specific
 .DS_Store 
+
+# Supplementary folders & files
+ai-data-science-team/explanation/
+ai-data-science-team/implementation_plans/
+ai-data-science-team/logs/
+ai-data-science-team/data/
+ai-data-science-team/data/raw/
+ai-data-science-team/data/cleaned/
