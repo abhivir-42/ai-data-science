@@ -3,17 +3,75 @@ uAgents adapter for AI Data Science agents.
 
 This module provides adapter functionality to convert AI Data Science agents
 into uAgents that can interact with other agents in the Fetch AI Agentverse.
-Simplified to avoid common issues.
 """
 
 import os
 import pandas as pd
-from typing import Dict, Any, Optional
+import dotenv
+from typing import Dict, Any, Optional, Callable, Union
+import logging
+from pathlib import Path
 
 from langchain_core.language_models import BaseLanguageModel
 
 from src.agents.data_cleaning_agent import DataCleaningAgent
 from src.agents.data_loader_tools_agent import DataLoaderToolsAgent
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+def load_env_keys() -> Dict[str, Optional[str]]:
+    """
+    Load API keys from environment variables or .env file.
+    
+    Returns
+    -------
+    Dict[str, Optional[str]]
+        Dictionary with API keys
+    """
+    # Try to load from .env file in project root
+    dotenv_path = Path(os.getcwd()) / "ai-data-science" / ".env"
+    if dotenv_path.exists():
+        dotenv.load_dotenv(dotenv_path)
+    
+    return {
+        "openai_api_key": os.environ.get("OPENAI_API_KEY"),
+        "agentverse_api_token": os.environ.get("AGENTVERSE_API_TOKEN"),
+    }
+
+
+def cleanup_uagent(name: str) -> Dict[str, Any]:
+    """
+    Cleanup and deregister a uAgent.
+    
+    Parameters
+    ----------
+    name : str
+        Name of the agent to clean up
+        
+    Returns
+    -------
+    Dict[str, Any]
+        Status of the cleanup operation
+    """
+    try:
+        from uagents_adapter import cleanup_uagent as adapter_cleanup
+        result = adapter_cleanup(name)
+        return {"status": "success", "message": f"Agent {name} cleaned up successfully", "details": result}
+    except ImportError as e:
+        return {
+            "status": "error",
+            "error": f"Failed to import uAgents dependencies: {str(e)}",
+            "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": f"Failed to clean up agent: {str(e)}",
+            "solution": "Ensure the agent is running and the name is correct"
+        }
 
 
 class DataCleaningAgentAdapter:
@@ -82,6 +140,12 @@ class DataCleaningAgentAdapter:
             self.description = description
             
         self.mailbox = mailbox
+        
+        # Try to get API token from init params, then from env
+        if api_token is None:
+            keys = load_env_keys()
+            api_token = keys.get("agentverse_api_token")
+            
         self.api_token = api_token
         self.n_samples = n_samples
         self.log = log
@@ -99,6 +163,10 @@ class DataCleaningAgentAdapter:
         
         # Initialize uAgent info
         self.uagent_info = None
+        
+        # Print init confirmation with partial API token for verification
+        token_preview = self.api_token[:5] + "..." + self.api_token[-5:] if self.api_token else "None"
+        logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
     
     def register(self) -> Dict[str, Any]:
         """
@@ -116,14 +184,61 @@ class DataCleaningAgentAdapter:
         """
         try:
             # Import here to avoid dependency issues if uagents is not installed
-            from uagents_adapter.langchain import UAgentRegisterTool
+            from uagents_adapter import UAgentRegisterTool
             
-            # Create the agent executor from the simplified adapter
+            # Check if API token is available
+            if not self.api_token:
+                return {
+                    "error": "API token not provided",
+                    "solution": "Set api_token parameter or add AGENTVERSE_API_TOKEN to environment variables"
+                }
+            
+            # Define the wrapper function to handle the agent invocation
+            def data_cleaning_wrapper(query: dict) -> dict:
+                """Wrapper function to invoke the DataCleaningAgent."""
+                logger.info(f"Data cleaning request received: {query}")
+                
+                # Extract instructions and data from query
+                instructions = query.get("instructions", "")
+                data_dict = query.get("data", {})
+                
+                # Convert data to DataFrame if provided
+                if data_dict:
+                    data = pd.DataFrame.from_dict(data_dict)
+                else:
+                    return {"error": "No data provided in query"}
+                
+                # Invoke the agent
+                self.agent.invoke_agent(
+                    data_raw=data,
+                    user_instructions=instructions
+                )
+                
+                # Get results
+                cleaned_data = self.agent.get_data_cleaned()
+                
+                # Return results
+                if cleaned_data is not None:
+                    response = {
+                        "status": "success",
+                        "data": cleaned_data.to_dict(),
+                        "summary": self.agent.get_workflow_summary()
+                    }
+                else:
+                    response = {
+                        "status": "error",
+                        "error": "Failed to clean data",
+                        "summary": self.agent.get_workflow_summary()
+                    }
+                
+                return response
+            
+            # Create the registration tool
             uagent_register_tool = UAgentRegisterTool()
             
-            # Register the agent
+            # Register the agent with the wrapper function
             result = uagent_register_tool.invoke({
-                "agent_obj": self.agent,
+                "agent_obj": data_cleaning_wrapper,
                 "name": self.name,
                 "port": self.port,
                 "description": self.description,
@@ -133,14 +248,17 @@ class DataCleaningAgentAdapter:
             })
             
             self.uagent_info = result
+            logger.info(f"Agent registered successfully: {self.name}")
             return result
             
         except ImportError as e:
+            logger.error(f"Import error: {e}")
             return {
                 "error": f"Failed to import uAgents dependencies: {str(e)}",
-                "solution": "Install required packages with: pip install 'uagents-adapter[langchain]>=2.2.0'"
+                "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
             }
         except Exception as e:
+            logger.error(f"Registration error: {e}")
             return {
                 "error": f"Failed to register agent: {str(e)}",
                 "solution": "Ensure you have the latest uAgents version installed and check network connectivity"
@@ -182,6 +300,17 @@ class DataCleaningAgentAdapter:
         )
         
         return self.agent.get_data_cleaned()
+    
+    def cleanup(self) -> Dict[str, Any]:
+        """
+        Clean up and deregister the agent.
+        
+        Returns
+        -------
+        Dict[str, Any]
+            Status of the cleanup operation
+        """
+        return cleanup_uagent(self.name)
 
 
 class DataLoaderToolsAgentAdapter:
@@ -238,6 +367,12 @@ class DataLoaderToolsAgentAdapter:
             self.description = description
             
         self.mailbox = mailbox
+        
+        # Try to get API token from init params, then from env
+        if api_token is None:
+            keys = load_env_keys()
+            api_token = keys.get("agentverse_api_token")
+            
         self.api_token = api_token
         
         # Create the DataLoaderToolsAgent with default parameters
@@ -247,6 +382,10 @@ class DataLoaderToolsAgentAdapter:
         
         # Initialize uAgent info
         self.uagent_info = None
+        
+        # Print init confirmation with partial API token for verification
+        token_preview = self.api_token[:5] + "..." + self.api_token[-5:] if self.api_token else "None"
+        logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
     
     def register(self) -> Dict[str, Any]:
         """
@@ -264,14 +403,64 @@ class DataLoaderToolsAgentAdapter:
         """
         try:
             # Import here to avoid dependency issues if uagents is not installed
-            from uagents_adapter.langchain import UAgentRegisterTool
+            from uagents_adapter import UAgentRegisterTool
             
-            # Create the agent executor from the simplified adapter
+            # Check if API token is available
+            if not self.api_token:
+                return {
+                    "error": "API token not provided",
+                    "solution": "Set api_token parameter or add AGENTVERSE_API_TOKEN to environment variables"
+                }
+            
+            # Define the wrapper function to handle the agent invocation
+            def data_loader_wrapper(query: dict) -> dict:
+                """Wrapper function to invoke the DataLoaderToolsAgent."""
+                logger.info(f"Data loading request received: {query}")
+                
+                # Extract instructions from query
+                instructions = query.get("instructions", "")
+                
+                if not instructions:
+                    return {"error": "No instructions provided in query"}
+                
+                # Invoke the agent
+                self.agent.invoke_agent(
+                    user_instructions=instructions
+                )
+                
+                # Get results
+                artifacts = self.agent.get_artifacts()
+                
+                # Return results
+                if artifacts:
+                    # Try to convert to DataFrame if it's a dict with 'data'
+                    if isinstance(artifacts, dict) and "data" in artifacts:
+                        data_df = pd.DataFrame.from_dict(artifacts["data"])
+                        response = {
+                            "status": "success",
+                            "data": data_df.to_dict(),
+                            "file_info": artifacts.get("file_info", {})
+                        }
+                    else:
+                        response = {
+                            "status": "success",
+                            "data": artifacts,
+                        }
+                else:
+                    response = {
+                        "status": "error",
+                        "error": "Failed to load data",
+                        "tool_calls": self.agent.get_tool_calls()
+                    }
+                
+                return response
+            
+            # Create the registration tool
             uagent_register_tool = UAgentRegisterTool()
             
-            # Register the agent
+            # Register the agent with the wrapper function
             result = uagent_register_tool.invoke({
-                "agent_obj": self.agent,
+                "agent_obj": data_loader_wrapper,
                 "name": self.name,
                 "port": self.port,
                 "description": self.description,
@@ -281,14 +470,17 @@ class DataLoaderToolsAgentAdapter:
             })
             
             self.uagent_info = result
+            logger.info(f"Agent registered successfully: {self.name}")
             return result
             
         except ImportError as e:
+            logger.error(f"Import error: {e}")
             return {
                 "error": f"Failed to import uAgents dependencies: {str(e)}",
-                "solution": "Install required packages with: pip install 'uagents-adapter[langchain]>=2.2.0'"
+                "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
             }
         except Exception as e:
+            logger.error(f"Registration error: {e}")
             return {
                 "error": f"Failed to register agent: {str(e)}",
                 "solution": "Ensure you have the latest uAgents version installed and check network connectivity"
@@ -326,4 +518,15 @@ class DataLoaderToolsAgentAdapter:
             user_instructions=instructions
         )
         
-        return self.agent.get_artifacts(as_dataframe=True) 
+        return self.agent.get_artifacts(as_dataframe=True)
+    
+    def cleanup(self) -> Dict[str, Any]:
+        """
+        Clean up and deregister the agent.
+        
+        Returns
+        -------
+        Dict[str, Any]
+            Status of the cleanup operation
+        """
+        return cleanup_uagent(self.name) 
