@@ -31,7 +31,7 @@ This plan outlines the steps to adapt our existing langchain/langgraph agents to
   - [x] Test cleanup and deregistration
 
 ## Dependencies
-- uagents-adapter >= 2.2.0 
+- uagents-adapter >= 0.2.1
 - python-dotenv
 - langchain
 - langgraph
@@ -39,13 +39,14 @@ This plan outlines the steps to adapt our existing langchain/langgraph agents to
 
 ## Implementation Notes
 
-- The uagents_adapter.py file has been updated to support the latest uAgents API
+- The uagents_adapter.py file has been updated to support the latest uAgents API (0.2.1)
 - We've added automatic loading of API keys from the .env file
 - Wrapper functions have been created to handle agent invocation
 - Support for cleanup and deregistration has been added
 - A test script has been created in examples/test_uagents_adapters.py
 - The README has been updated with usage instructions and examples
 - Added uagents_interaction_demo.py to demonstrate agent communication
+- Added robust error handling and version compatibility for different uagents-adapter versions
 
 ## Running the Tests
 
@@ -58,7 +59,7 @@ To test the agents:
 
 2. Install the required dependencies:
    ```
-   pip install 'uagents-adapter>=2.2.0' python-dotenv
+   pip install 'uagents-adapter>=0.2.1' python-dotenv
    ```
 
 3. Add your API keys to the .env file:
@@ -103,4 +104,11 @@ To verify that the agents are properly registered with Agentverse:
 1. Run the interaction demo
 2. Note the agent addresses displayed in the console
 3. These addresses can be used by other uAgents to communicate with our agents
-4. Cleanup is handled automatically when the script is terminated with Ctrl+C 
+4. Cleanup is handled automatically when the script is terminated with Ctrl+C
+
+## Compatibility Notes
+
+This implementation is compatible with:
+- uagents-adapter 0.2.1 (current version)
+- Future versions should also work with the flexible import structure
+- Handles version-specific differences in API naming and module organization 

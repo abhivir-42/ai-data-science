@@ -32,9 +32,14 @@ def load_env_keys() -> Dict[str, Optional[str]]:
         Dictionary with API keys
     """
     # Try to load from .env file in project root
-    dotenv_path = Path(os.getcwd()) / "ai-data-science" / ".env"
+    dotenv_path = Path(os.getcwd()) / ".env"
     if dotenv_path.exists():
         dotenv.load_dotenv(dotenv_path)
+    else:
+        # Try the ai-data-science subdirectory
+        dotenv_path = Path(os.getcwd()) / "ai-data-science" / ".env"
+        if dotenv_path.exists():
+            dotenv.load_dotenv(dotenv_path)
     
     return {
         "openai_api_key": os.environ.get("OPENAI_API_KEY"),
@@ -57,14 +62,27 @@ def cleanup_uagent(name: str) -> Dict[str, Any]:
         Status of the cleanup operation
     """
     try:
-        from uagents_adapter import cleanup_uagent as adapter_cleanup
-        result = adapter_cleanup(name)
+        # Import the specific cleanup function for the appropriate version
+        try:
+            # Try to import from root module first (version 0.2.x)
+            from uagents_adapter import cleanup_agent as adapter_cleanup
+            result = adapter_cleanup(name)
+        except (ImportError, AttributeError):
+            # Fallback to version-specific import location
+            try:
+                from uagents_adapter.common import cleanup_agent as adapter_cleanup
+                result = adapter_cleanup(name)
+            except (ImportError, AttributeError):
+                # Last attempt - look for cleanup_uagent
+                from uagents_adapter import cleanup_uagent as adapter_cleanup
+                result = adapter_cleanup(name)
+        
         return {"status": "success", "message": f"Agent {name} cleaned up successfully", "details": result}
     except ImportError as e:
         return {
             "status": "error",
             "error": f"Failed to import uAgents dependencies: {str(e)}",
-            "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
+            "solution": "Install required packages with: pip install 'uagents-adapter>=0.1.0'"
         }
     except Exception as e:
         return {
@@ -165,8 +183,11 @@ class DataCleaningAgentAdapter:
         self.uagent_info = None
         
         # Print init confirmation with partial API token for verification
-        token_preview = self.api_token[:5] + "..." + self.api_token[-5:] if self.api_token else "None"
-        logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
+        if self.api_token and len(self.api_token) > 10:
+            token_preview = self.api_token[:5] + "..." + self.api_token[-5:]
+            logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
+        else:
+            logger.warning(f"Initialized {self.name} adapter without a valid API token")
     
     def register(self) -> Dict[str, Any]:
         """
@@ -180,11 +201,23 @@ class DataCleaningAgentAdapter:
         Note
         ----
         This method requires the 'uagents' and 'uagents-adapter' packages to be installed.
-        For best results, use version 2.2.0 or later of both packages.
         """
         try:
             # Import here to avoid dependency issues if uagents is not installed
-            from uagents_adapter import UAgentRegisterTool
+            # Handle different versions of the uagents-adapter package
+            try:
+                # Try with version 0.2.x
+                from uagents_adapter import UAgentRegisterTool
+                register_tool_class = UAgentRegisterTool
+            except ImportError:
+                try:
+                    # Try with version <0.2.0 (langchain-specific)
+                    from uagents_adapter.langchain import UAgentRegisterTool
+                    register_tool_class = UAgentRegisterTool
+                except ImportError:
+                    # Last attempt
+                    from uagents_adapter.common import UAgentRegisterTool
+                    register_tool_class = UAgentRegisterTool
             
             # Check if API token is available
             if not self.api_token:
@@ -234,10 +267,10 @@ class DataCleaningAgentAdapter:
                 return response
             
             # Create the registration tool
-            uagent_register_tool = UAgentRegisterTool()
+            uagent_register_tool = register_tool_class()
             
-            # Register the agent with the wrapper function
-            result = uagent_register_tool.invoke({
+            # Prepare registration parameters with version compatibility
+            registration_params = {
                 "agent_obj": data_cleaning_wrapper,
                 "name": self.name,
                 "port": self.port,
@@ -245,7 +278,10 @@ class DataCleaningAgentAdapter:
                 "mailbox": self.mailbox,
                 "api_token": self.api_token,
                 "return_dict": True
-            })
+            }
+            
+            # Register the agent with the wrapper function
+            result = uagent_register_tool.invoke(registration_params)
             
             self.uagent_info = result
             logger.info(f"Agent registered successfully: {self.name}")
@@ -255,7 +291,7 @@ class DataCleaningAgentAdapter:
             logger.error(f"Import error: {e}")
             return {
                 "error": f"Failed to import uAgents dependencies: {str(e)}",
-                "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
+                "solution": "Install required packages with: pip install 'uagents-adapter>=0.1.0'"
             }
         except Exception as e:
             logger.error(f"Registration error: {e}")
@@ -384,8 +420,11 @@ class DataLoaderToolsAgentAdapter:
         self.uagent_info = None
         
         # Print init confirmation with partial API token for verification
-        token_preview = self.api_token[:5] + "..." + self.api_token[-5:] if self.api_token else "None"
-        logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
+        if self.api_token and len(self.api_token) > 10:
+            token_preview = self.api_token[:5] + "..." + self.api_token[-5:]
+            logger.info(f"Initialized {self.name} adapter with API token: {token_preview}")
+        else:
+            logger.warning(f"Initialized {self.name} adapter without a valid API token")
     
     def register(self) -> Dict[str, Any]:
         """
@@ -399,11 +438,23 @@ class DataLoaderToolsAgentAdapter:
         Note
         ----
         This method requires the 'uagents' and 'uagents-adapter' packages to be installed.
-        For best results, use version 2.2.0 or later of both packages.
         """
         try:
             # Import here to avoid dependency issues if uagents is not installed
-            from uagents_adapter import UAgentRegisterTool
+            # Handle different versions of the uagents-adapter package
+            try:
+                # Try with version 0.2.x
+                from uagents_adapter import UAgentRegisterTool
+                register_tool_class = UAgentRegisterTool
+            except ImportError:
+                try:
+                    # Try with version <0.2.0 (langchain-specific)
+                    from uagents_adapter.langchain import UAgentRegisterTool
+                    register_tool_class = UAgentRegisterTool
+                except ImportError:
+                    # Last attempt
+                    from uagents_adapter.common import UAgentRegisterTool
+                    register_tool_class = UAgentRegisterTool
             
             # Check if API token is available
             if not self.api_token:
@@ -456,10 +507,10 @@ class DataLoaderToolsAgentAdapter:
                 return response
             
             # Create the registration tool
-            uagent_register_tool = UAgentRegisterTool()
+            uagent_register_tool = register_tool_class()
             
-            # Register the agent with the wrapper function
-            result = uagent_register_tool.invoke({
+            # Prepare registration parameters with version compatibility
+            registration_params = {
                 "agent_obj": data_loader_wrapper,
                 "name": self.name,
                 "port": self.port,
@@ -467,7 +518,10 @@ class DataLoaderToolsAgentAdapter:
                 "mailbox": self.mailbox,
                 "api_token": self.api_token,
                 "return_dict": True
-            })
+            }
+            
+            # Register the agent with the wrapper function
+            result = uagent_register_tool.invoke(registration_params)
             
             self.uagent_info = result
             logger.info(f"Agent registered successfully: {self.name}")
@@ -477,7 +531,7 @@ class DataLoaderToolsAgentAdapter:
             logger.error(f"Import error: {e}")
             return {
                 "error": f"Failed to import uAgents dependencies: {str(e)}",
-                "solution": "Install required packages with: pip install 'uagents-adapter>=2.2.0'"
+                "solution": "Install required packages with: pip install 'uagents-adapter>=0.1.0'"
             }
         except Exception as e:
             logger.error(f"Registration error: {e}")

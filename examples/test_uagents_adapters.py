@@ -33,7 +33,7 @@ from src.adapters.uagents_adapter import (
 )
 
 # Try to load from .env file
-dotenv.load_dotenv(project_root / ".env")
+dotenv.load_dotenv(Path(os.getcwd()) / ".env")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 AGENTVERSE_API_TOKEN = os.environ.get("AGENTVERSE_API_TOKEN")
 
@@ -76,8 +76,15 @@ def create_sample_data(num_rows=100):
     
     return df, csv_path
 
-def test_data_cleaning_agent():
-    """Test the DataCleaningAgentAdapter."""
+def test_data_cleaning_agent(interactive=False):
+    """
+    Test the DataCleaningAgentAdapter.
+    
+    Parameters
+    ----------
+    interactive : bool
+        If True, keep the agent running and wait for Ctrl+C to stop
+    """
     try:
         logger.info("Testing DataCleaningAgentAdapter...")
         
@@ -130,8 +137,8 @@ def test_data_cleaning_agent():
             logger.error("Direct cleaning failed")
             return False
         
-        # Register the agent with Agentverse
-        if AGENTVERSE_API_TOKEN:
+        # If interactive mode is enabled and we have an API token, register the agent with Agentverse
+        if interactive and AGENTVERSE_API_TOKEN:
             logger.info("Registering data cleaning agent with Agentverse...")
             result = adapter.register()
             
@@ -153,7 +160,7 @@ def test_data_cleaning_agent():
                 cleanup_result = adapter.cleanup()
                 logger.info(f"Cleanup result: {cleanup_result}")
                 keep_running = False
-        else:
+        elif not AGENTVERSE_API_TOKEN and interactive:
             logger.warning("AGENTVERSE_API_TOKEN not found, skipping registration")
         
         return True
@@ -162,8 +169,15 @@ def test_data_cleaning_agent():
         logger.exception(f"Error in test_data_cleaning_agent: {str(e)}")
         return False
 
-def test_data_loader_agent():
-    """Test the DataLoaderToolsAgentAdapter."""
+def test_data_loader_agent(interactive=False):
+    """
+    Test the DataLoaderToolsAgentAdapter.
+    
+    Parameters
+    ----------
+    interactive : bool
+        If True, keep the agent running and wait for Ctrl+C to stop
+    """
     try:
         logger.info("Testing DataLoaderToolsAgentAdapter...")
         
@@ -209,8 +223,8 @@ def test_data_loader_agent():
             logger.error(f"Direct loading failed: {loaded_df}")
             return False
         
-        # Register the agent with Agentverse
-        if AGENTVERSE_API_TOKEN:
+        # If interactive mode is enabled and we have an API token, register the agent with Agentverse
+        if interactive and AGENTVERSE_API_TOKEN:
             logger.info("Registering data loader agent with Agentverse...")
             result = adapter.register()
             
@@ -232,7 +246,7 @@ def test_data_loader_agent():
                 cleanup_result = adapter.cleanup()
                 logger.info(f"Cleanup result: {cleanup_result}")
                 keep_running = False
-        else:
+        elif not AGENTVERSE_API_TOKEN and interactive:
             logger.warning("AGENTVERSE_API_TOKEN not found, skipping registration")
         
         return True
@@ -247,21 +261,49 @@ def main():
     parser.add_argument("--cleaner", action="store_true", help="Test the data cleaning agent")
     parser.add_argument("--loader", action="store_true", help="Test the data loader agent")
     parser.add_argument("--all", action="store_true", help="Test all agents")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode with agent registration")
+    parser.add_argument("--check-deps", action="store_true", help="Only check dependencies without running tests")
     
     args = parser.parse_args()
     
     # Print API token information
     if AGENTVERSE_API_TOKEN:
-        token_preview = AGENTVERSE_API_TOKEN[:5] + "..." + AGENTVERSE_API_TOKEN[-5:]
-        logger.info(f"Using Agentverse API token: {token_preview}")
+        if len(AGENTVERSE_API_TOKEN) > 10:
+            token_preview = AGENTVERSE_API_TOKEN[:5] + "..." + AGENTVERSE_API_TOKEN[-5:]
+            logger.info(f"Using Agentverse API token: {token_preview}")
+        else:
+            logger.warning(f"Agentverse API token appears to be invalid: {AGENTVERSE_API_TOKEN}")
     else:
         logger.warning("No Agentverse API token found")
     
+    # Check dependencies
+    if args.check_deps or not (args.cleaner or args.loader or args.all):
+        try:
+            import uagents_adapter
+            logger.info(f"uagents-adapter version: {uagents_adapter.__version__}")
+        except (ImportError, AttributeError):
+            try:
+                # Try a different way to check
+                logger.info("Checking uagents-adapter installation...")
+                import importlib.metadata
+                version = importlib.metadata.version("uagents-adapter")
+                logger.info(f"uagents-adapter version: {version}")
+            except:
+                logger.error("uagents-adapter package not found or version cannot be determined")
+                logger.info("Please install with: pip install 'uagents-adapter>=0.2.1'")
+                if not args.check_deps:
+                    return
+    
+    # Only perform dependency check if that's all that was requested
+    if args.check_deps:
+        return
+    
+    # Run the tests
     if args.cleaner or args.all:
-        test_data_cleaning_agent()
+        test_data_cleaning_agent(args.interactive)
     
     if args.loader or args.all:
-        test_data_loader_agent()
+        test_data_loader_agent(args.interactive)
     
     if not args.cleaner and not args.loader and not args.all:
         logger.info("No test specified. Use --cleaner, --loader, or --all")
