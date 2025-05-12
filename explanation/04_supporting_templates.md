@@ -62,6 +62,7 @@ class BaseAgent(ABC):
         """
         return self.response
     
+    # the keys in response dict
     def get_state_keys(self):
         """
         Get the keys in the agent's state.
