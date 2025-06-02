@@ -159,9 +159,21 @@ def node_func_execute_agent_code_on_data(
     data = state.get(data_key)
     code_snippet = state.get(code_snippet_key)
     
-    if not code_snippet or not data:
+    # Check for missing code or data properly
+    if not code_snippet:
         return {
-            error_key: f"{error_message_prefix}Missing code or data in state"
+            error_key: f"{error_message_prefix}Missing code in state"
+        }
+    
+    if data is None:
+        return {
+            error_key: f"{error_message_prefix}Missing data in state"
+        }
+    
+    # Additional check for empty DataFrame
+    if hasattr(data, 'empty') and data.empty:
+        return {
+            error_key: f"{error_message_prefix}Data is empty"
         }
     
     # Prepare empty namespace for execution
@@ -503,46 +515,34 @@ def create_coding_agent_graph(
     # Connect create code to execute code
     workflow.add_edge(create_code_node_name, execute_code_node_name)
     
-    # Add conditional routing based on errors
-    def has_error(state):
-        return bool(state.get(error_key))
-    
-    def no_error(state):
-        return not bool(state.get(error_key))
-    
-    def check_max_retries(state):
+    # Add conditional routing based on errors and retries
+    def should_retry(state):
+        """Check if we have an error and haven't exceeded max retries."""
+        has_error = bool(state.get(error_key))
         retry_count = state.get("retry_count", 0)
         max_retries = state.get("max_retries", 3)
-        return retry_count >= max_retries
+        can_retry = retry_count < max_retries
+        
+        return has_error and can_retry
     
     def increment_retry_count(state):
+        """Increment the retry count."""
         return {"retry_count": state.get("retry_count", 0) + 1}
     
     # Check for errors after executing code
     workflow.add_conditional_edges(
         execute_code_node_name,
-        has_error,
+        should_retry,
         {
             True: fix_code_node_name,
             False: explain_code_node_name if not bypass_explain_code else END
         }
     )
     
-    # Check max retries after fixing code
-    workflow.add_conditional_edges(
-        fix_code_node_name,
-        check_max_retries,
-        {
-            True: explain_code_node_name if not bypass_explain_code else END,
-            False: execute_code_node_name
-        }
-    )
-    
-    # Update retry count before executing code again
-    # First add the increment_retry_count node
+    # Add the increment_retry_count node
     workflow.add_node("increment_retry_count", increment_retry_count)
     
-    # Connect the fix_code_node to increment_retry_count and then to execute_code_node
+    # FIXED: Single path from fix_code to increment_retry_count to execute_code
     workflow.add_edge(fix_code_node_name, "increment_retry_count")
     workflow.add_edge("increment_retry_count", execute_code_node_name)
     
