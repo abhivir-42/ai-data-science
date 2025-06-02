@@ -15,7 +15,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-from ai_data_science.adapters.uagents_adapter import DataCleaningAgentAdapter
+from src.adapters.uagents_adapter import DataCleaningAgentAdapter
 
 # Load environment variables
 load_dotenv()
