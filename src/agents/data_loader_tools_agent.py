@@ -242,7 +242,16 @@ class DataLoaderToolsAgent(BaseAgent):
             
         if as_dataframe and self.response.get("data_loader_artifacts"):
             if isinstance(self.response["data_loader_artifacts"], dict) and "data" in self.response["data_loader_artifacts"]:
-                return pd.DataFrame.from_dict(self.response["data_loader_artifacts"]["data"])
+                # Fix the DataFrame conversion issue - use orient='dict' to preserve shape
+                data_dict = self.response["data_loader_artifacts"]["data"]
+                try:
+                    # Try to create DataFrame properly preserving original shape
+                    df = pd.DataFrame.from_dict(data_dict, orient='columns')
+                    return df
+                except Exception as e:
+                    print(f"Warning: Error converting to DataFrame: {e}")
+                    # Fallback to original method if there's an issue
+                    return pd.DataFrame(data_dict)
             return pd.DataFrame(self.response["data_loader_artifacts"])
         else:
             return self.response.get("data_loader_artifacts", {})
@@ -282,6 +291,38 @@ class DataLoaderToolsAgent(BaseAgent):
             return "No response available. Run invoke_agent() first."
             
         return self.response.get("tool_calls", [])
+
+
+def _is_valid_data_artifact(content_dict):
+    """
+    Check if a dictionary is a valid data artifact.
+    
+    Parameters
+    ----------
+    content_dict : dict
+        Dictionary to check
+        
+    Returns
+    -------
+    bool
+        True if valid data artifact
+    """
+    if not isinstance(content_dict, dict):
+        return False
+    
+    # Check for standard data structure
+    if "data" in content_dict:
+        return True
+    
+    # Check for chunked data structure
+    if "chunk_info" in content_dict and "full_dataframe" in content_dict:
+        return True
+    
+    # Check for error structure
+    if "error" in content_dict:
+        return False
+    
+    return False
 
 
 def make_data_loader_tools_agent(
@@ -395,21 +436,29 @@ def make_data_loader_tools_agent(
         for msg in internal_messages:
             if isinstance(msg, ToolMessage):
                 if msg.name in ["load_file", "load_directory"]:
+                    print(f"    * Checking tool message: {msg.name}")
+                    
                     # Try to parse the content if it's a string
                     if isinstance(msg.content, str):
                         try:
                             content_dict = json.loads(msg.content)
-                            if isinstance(content_dict, dict) and "data" in content_dict:
+                            if _is_valid_data_artifact(content_dict):
                                 last_tool_artifact = content_dict
-                                print(f"    * Found data in tool message: {msg.name}")
+                                print(f"    * Found data in tool message: {msg.name} (JSON string)")
                                 break
-                        except:
-                            pass
+                        except Exception as e:
+                            print(f"    * Failed to parse JSON from tool message: {e}")
+                    
                     # If content is already a dict
-                    elif isinstance(msg.content, dict) and "data" in msg.content:
+                    elif isinstance(msg.content, dict) and _is_valid_data_artifact(msg.content):
                         last_tool_artifact = msg.content
-                        print(f"    * Found data in tool message: {msg.name}")
+                        print(f"    * Found data in tool message: {msg.name} (dict)")
                         break
+                    
+                    # For debugging
+                    print(f"    * Tool message content type: {type(msg.content)}")
+                    if isinstance(msg.content, dict):
+                        print(f"    * Tool message keys: {list(msg.content.keys())}")
 
         # Extract tool calls from the messages
         tool_calls = get_tool_call_names(internal_messages)
@@ -417,29 +466,41 @@ def make_data_loader_tools_agent(
         # If still no artifact but load tools were called, try to reconstruct
         if last_tool_artifact is None and ("load_file" in tool_calls or "load_directory" in tool_calls):
             print("    * WARNING: Data loading tool was called but no artifact found in messages")
+            print("    * Attempting direct tool execution as fallback...")
             
             # Try direct tool execution as fallback
             for msg in internal_messages:
                 if isinstance(msg, ToolMessage) and msg.name == "load_file":
-                    # Extract arguments and call tool directly
-                    try:
-                        if hasattr(msg, "input") and isinstance(msg.input, dict) and "file_path" in msg.input:
-                            file_path = msg.input["file_path"]
+                    # Look for file path in various places
+                    file_path = None
+                    
+                    # Check if we can extract file path from the message
+                    if hasattr(msg, 'tool_input') and isinstance(msg.tool_input, dict):
+                        file_path = msg.tool_input.get("file_path")
+                    elif isinstance(msg.content, str) and "file_path" in msg.content:
+                        # Try to extract from content string
+                        import re
+                        match = re.search(r'file_path["\']?\s*:\s*["\']?([^"\']+)["\']?', msg.content)
+                        if match:
+                            file_path = match.group(1)
+                    
+                    if file_path:
+                        try:
                             print(f"    * Directly loading file: {file_path}")
                             result = load_file(file_path)
-                            if isinstance(result, dict) and "data" in result:
+                            if _is_valid_data_artifact(result):
                                 last_tool_artifact = result
                                 print(f"    * Successfully loaded file directly")
                                 break
-                    except Exception as e:
-                        print(f"    * Error loading file directly: {e}")
+                        except Exception as e:
+                            print(f"    * Error loading file directly: {e}")
         
         # Create a useful error message if data loading failed
         if last_tool_artifact is None and ("load_file" in tool_calls or "load_directory" in tool_calls):
             print("    * Creating empty data structure as fallback")
             # Create a minimal structure to avoid errors
             last_tool_artifact = {
-                "data": [],
+                "data": {},
                 "file_info": {
                     "path": "unknown",
                     "name": "unknown",
