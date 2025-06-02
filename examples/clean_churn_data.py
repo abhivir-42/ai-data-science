@@ -192,7 +192,16 @@ def mock_cleaning(df):
     
     # Fill missing categorical values with "Unknown"
     for col in cleaned_df.select_dtypes(include=["object", "category"]).columns:
-        cleaned_df[col] = cleaned_df[col].fillna("Unknown")
+        if str(cleaned_df[col].dtype) == 'category':
+            # Safe categorical handling - prevents "Cannot setitem on a Categorical" error
+            if not cleaned_df[col].mode().empty:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
+            else:
+                # Convert to object first, then fill with 'Unknown'
+                cleaned_df[col] = cleaned_df[col].astype('object').fillna('Unknown')
+        else:
+            # Standard object columns can be filled directly
+            cleaned_df[col] = cleaned_df[col].fillna("Unknown")
     
     # Remove outliers (simplified)
     numerical_cols = cleaned_df.select_dtypes(include=[np.number]).columns
@@ -225,7 +234,16 @@ def data_cleaner(data_raw):
     
     # Fill missing categorical values with "Unknown"
     for col in df.select_dtypes(include=["object", "category"]).columns:
-        df[col] = df[col].fillna("Unknown")
+        if str(df[col].dtype) == 'category':
+            # Safe categorical handling - prevents "Cannot setitem on a Categorical" error
+            if not df[col].mode().empty:
+                df[col] = df[col].fillna(df[col].mode()[0])
+            else:
+                # Convert to object first, then fill with 'Unknown'
+                df[col] = df[col].astype('object').fillna('Unknown')
+        else:
+            # Standard object columns can be filled directly
+            df[col] = df[col].fillna("Unknown")
     
     # Remove outliers (using 3x IQR method)
     numerical_cols = df.select_dtypes(include=[np.number]).columns
