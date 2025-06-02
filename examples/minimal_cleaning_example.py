@@ -9,7 +9,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
-from ai_data_science.agents.data_cleaning_agent import DataCleaningAgent
+from src.agents.data_cleaning_agent import DataCleaningAgent
 
 # Load environment variables
 load_dotenv()
