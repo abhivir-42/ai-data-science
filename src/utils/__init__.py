@@ -16,6 +16,7 @@ from src.utils.regex import (
 
 from src.utils.logging import log_ai_function
 from src.utils.messages import get_tool_call_names
+from src.utils.plotly import plotly_from_dict
 
 __all__ = [
     "format_recommended_steps",
@@ -25,5 +26,6 @@ __all__ = [
     "remove_language_tags",
     "relocate_imports_inside_function", 
     "log_ai_function",
-    "get_tool_call_names"
+    "get_tool_call_names",
+    "plotly_from_dict"
 ] 
