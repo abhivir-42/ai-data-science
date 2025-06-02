@@ -53,6 +53,7 @@ coverage.xml
 
 # Logs
 logs/
+debug_logs/
 
 # OS specific
 .DS_Store 
