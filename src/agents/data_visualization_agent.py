@@ -1,9 +1,3 @@
-# BUSINESS SCIENCE UNIVERSITY
-# AI DATA SCIENCE TEAM
-# ***
-# * Agents: Data Visualization Agent
-
-
 # Libraries
 from typing import TypedDict, Annotated, Sequence, Literal
 import operator
@@ -575,7 +569,7 @@ def make_data_visualization_agent(
         df = pd.DataFrame.from_dict(data_raw)
 
         all_datasets_summary = get_dataframe_summary(
-            [df], n_sample=n_samples, skip_stats=False
+            [df], n_sample=n_samples
         )
 
         all_datasets_summary_str = "\n\n".join(all_datasets_summary)
@@ -608,7 +602,7 @@ def make_data_visualization_agent(
             df = pd.DataFrame.from_dict(data_raw)
 
             all_datasets_summary = get_dataframe_summary(
-                [df], n_sample=n_samples, skip_stats=False
+                [df], n_sample=n_samples
             )
 
             all_datasets_summary_str = "\n\n".join(all_datasets_summary)
@@ -705,11 +699,11 @@ def make_data_visualization_agent(
 
         def human_review(
             state: GraphState,
-        ) -> Command[Literal["chart_instructor", "explain_data_visualization_code"]]:
+        ) -> Command[Literal["chart_instructor", "report_agent_outputs"]]:
             return node_func_human_review(
                 state=state,
                 prompt_text=prompt_text_human_review,
-                yes_goto="explain_data_visualization_code",
+                yes_goto="report_agent_outputs",
                 no_goto="chart_instructor",
                 user_instructions_key="user_instructions",
                 recommended_steps_key="recommended_steps",
