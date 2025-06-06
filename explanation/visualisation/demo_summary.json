@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-06-03T11:22:44.764385",
+  "demos_run": 2,
+  "successful_demos": 1,
+  "total_duration": 73.93580412864685,
+  "total_charts": 4,
+  "total_code_files": 2,
+  "demo_details": [
+    {
+      "name": "Demo 1: Basic Usage - Sales Data",
+      "success": true,
+      "duration": 33.47047305107117,
+      "results": [
+        {
+          "scenario": "Automatic Chart Selection",
+          "success": true,
+          "chart_file": "demo_1_scenario_1_automatic_chart_selection.html",
+          "code_length": 32
+        },
+        {
+          "scenario": "Scatter Plot with Correlation",
+          "success": true,
+          "chart_file": "demo_1_scenario_2_scatter_plot_with_correlation.html",
+          "code_length": 24
+        },
+        {
+          "scenario": "Time Series Analysis",
+          "success": true,
+          "chart_file": "demo_1_scenario_3_time_series_analysis.html",
+          "code_length": 37
+        },
+        {
+          "scenario": "Categorical Comparison",
+          "success": true,
+          "chart_file": "demo_1_scenario_4_categorical_comparison.html",
+          "code_length": 35
+        }
+      ],
+      "timestamp": "2025-06-03T11:22:02.286147"
+    },
+    {
+      "name": "Demo 2: Advanced Features - Customer Analytics",
+      "success": false,
+      "duration": 40.465331077575684,
+      "error": "local variable 'newline' referenced before assignment",
+      "timestamp": "2025-06-03T11:22:43.756431"
+    }
+  ]
+}
