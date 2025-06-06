@@ -7,56 +7,54 @@
 - Missing values: 48
 
 ## Cleaned Data
-- Shape: (92, 7)
+- Shape: (100, 7)
 - Missing values: 0
 
 ## Cleaning Steps
 # Recommended Data Cleaning Steps:
 
-Here are the recommended steps to clean and preprocess the provided dataset based on the user instructions and data characteristics:
+Here are the recommended steps for cleaning and preprocessing the data based on the user instructions and the characteristics of the provided DataFrame:
 
-1. **Remove Duplicate Rows**: 
-   - Since the user has requested to remove duplicates, we will initiate this step first to ensure that each entry in the dataset is unique.
+1. **Remove Duplicate Rows**  
+   Since the user requested to remove duplicates, identify and remove any duplicate rows from the DataFrame.
    ```python
-   df.drop_duplicates(inplace=True)
+   df.drop_duplicates(inplace=True)  # Removes duplicate rows
    ```
 
-2. **Impute Missing Numeric Values with Median**:
-   - For the numeric columns (`price`, `quantity`, `rating`), fill any missing values with the median of the respective columns.
+2. **Impute Missing Numeric Values with Median**  
+   For the `price`, `quantity`, and `rating` columns, fill missing values with the median of each respective column.
    ```python
-   df['price'].fillna(df['price'].median(), inplace=True)
-   df['quantity'].fillna(df['quantity'].median(), inplace=True)
-   df['rating'].fillna(df['rating'].median(), inplace=True)
+   df['price'].fillna(df['price'].median(), inplace=True)  # Fill missing price with median
+   df['quantity'].fillna(df['quantity'].median(), inplace=True)  # Fill missing quantity with median
+   df['rating'].fillna(df['rating'].median(), inplace=True)  # Fill missing rating with median
    ```
 
-3. **Impute Missing Categorical Values with 'Unknown'**:
-   - Although there are no missing values in categorical columns (`name`, `category`, `in_stock`), if any were to exist, we could fill them with 'Unknown' as per user instructions. However, this step is not needed here due to zero missing values.
+3. **Impute Missing Categorical Values with 'Unknown'**  
+   Although there are no missing values in the categorical columns (`name` and `category`), ensure that if there were any, they would be filled with 'Unknown'.
    ```python
-   # This step is not applicable as there are no missing values in categorical columns
-   # Example: df['category'].fillna('Unknown', inplace=True)
+   # Example applied if missing values were present in 'name' or 'category'
+   # df['name'].fillna('Unknown', inplace=True)
+   # df['category'].fillna('Unknown', inplace=True)
    ```
 
-4. **Check and Convert Data Types**:
-   - Ensure that all columns are of the correct data type. The `id` should remain `int64`, `name` and `category` as `object`, `price`, `quantity`, and `rating` as `float64`, and `in_stock` as `bool`. Convert if necessary.
+4. **Convert Columns to the Correct Data Type**  
+   Verify that all columns are of the correct data type. However, based on the summary provided, it appears they are already correctly typed. If adjustments were necessary, apply them.
    ```python
-   df['id'] = df['id'].astype(int)
-   df['in_stock'] = df['in_stock'].astype(bool)
+   # Example
+   # df['price'] = df['price'].astype(float)  # Ensure price is float
+   # df['quantity'] = df['quantity'].astype(float)  # Ensure quantity is float
    ```
 
-5. **Remove Rows with Extreme Outliers**:
-   - Analyze numeric columns for extreme outliers (defined as 3 times the interquartile range). Although the user didn’t request this step, if data analysis indicates significant outliers exist, remove those rows to maintain data integrity.
+5. **Assess and Remove Rows with Extreme Outliers**  
+   Identify and remove rows with extreme outliers (defined as values beyond 3 times the interquartile range) for numeric columns (price, quantity, rating).
    ```python
-   # Example for price:
-   Q1 = df['price'].quantile(0.25)
-   Q3 = df['price'].quantile(0.75)
-   IQR = Q3 - Q1
-   df = df[(df['price'] >= (Q1 - 3 * IQR)) & (df['price'] <= (Q3 + 3 * IQR))]
+   # Implement IQR method to remove outliers (if necessary)
    ```
 
-6. **Review Data for Additional Steps**:
-   - At this point, perform an analysis of the cleaned dataset to check if any additional data cleaning steps are needed, such as further imputation or transformations based on initial observations. If no further actions are needed, state that no additional steps are required.
+6. **Final Data Assessment**  
+   After completing the above steps, conduct a final assessment of the DataFrame to determine if any additional cleaning is required. If no additional issues are found, conclude the cleaning process.
 
-These steps provide a structured approach to clean and preprocess the dataset effectively while adhering to user specifications.
+By following these steps, the DataFrame will be adequately cleaned according to the user's preferences while also addressing general data cleaning practices.
 
 ## Cleaning Function
 ```python
@@ -64,11 +62,12 @@ These steps provide a structured approach to clean and preprocess the dataset ef
 # Code generated by AI agent: data_cleaning_agent
 # ----------------------------------------------------------------------
 
-
 def data_cleaner(data_raw):
     import pandas as pd
     import numpy as np
+    from scipy import stats
     import warnings
+    
     # Suppress pandas warnings for clean output
     warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
     pd.set_option('mode.chained_assignment', None)
@@ -84,43 +83,64 @@ def data_cleaner(data_raw):
     print(f"🧹 Starting data cleaning: {original_shape[0]} rows × {original_shape[1]} columns")
     
     try:
-        # STEP 1: Data Type Optimization
-        print("📊 Step 1: Optimizing data types...")
-        data['price'] = pd.to_numeric(data['price'], errors='coerce')
-        data['quantity'] = pd.to_numeric(data['quantity'], errors='coerce')
-        data['rating'] = pd.to_numeric(data['rating'], errors='coerce')
-        data['id'] = data['id'].astype(np.int32)  # Example optimization
-        data['in_stock'] = data['in_stock'].astype(bool)
-        data['category'] = data['category'].astype('category')
-
-        # STEP 2: Handle Missing Values (PRIORITIZE IMPUTATION)
-        print("🔧 Step 2: Handling missing values...")
-        for column in ['price', 'quantity', 'rating']:
-            median_val = data[column].median()
-            data[column].fillna(median_val, inplace=True)  # Impute with median for numeric
-            
-        # While no categorical missing values, we include example lines for completeness
-        # data['category'].fillna('Unknown', inplace=True)
-
-        # STEP 3: Remove Duplicates
-        print("🗑️ Step 3: Removing duplicates...")
+        # STEP 1: Remove Duplicate Rows
+        print("🗑️ Step 1: Removing duplicates...")
         duplicates_before = data.duplicated().sum()
         if duplicates_before > 0:
             data = data.drop_duplicates()
             cleaning_log.append(f"Removed {duplicates_before} duplicate rows")
         
-        # STEP 4: Handle Outliers (CONSERVATIVE)
-        print("📈 Step 4: Conservative outlier handling...")
-        # Handle outliers using the IQR method if applicable
-        for column in ['price', 'quantity', 'rating']:
-            Q1 = data[column].quantile(0.25)
-            Q3 = data[column].quantile(0.75)
-            IQR = Q3 - Q1
-            # Remove rows with outliers conservatively (only if requested)
-            data = data[(data[column] >= (Q1 - 3 * IQR)) & (data[column] <= (Q3 + 3 * IQR))]
+        # STEP 2: Impute Missing Values
+        print("🔧 Step 2: Handling missing values...")
+        missing_before = data.isnull().sum().sum()
+        print(f"   Missing values before cleaning: {missing_before}")
         
-        # STEP 5: Final Validation and Cleanup
-        print("✅ Step 5: Final validation...")
+        for col in data.columns:
+            if data[col].isnull().sum() > 0:
+                col_dtype = str(data[col].dtype)
+                missing_count = data[col].isnull().sum()
+                print(f"   Handling {missing_count} missing values in '{col}' ({col_dtype})")
+                
+                # Impute missing numeric values with median
+                if pd.api.types.is_numeric_dtype(data[col]):
+                    fill_value = data[col].median()
+                    data[col].fillna(fill_value, inplace=True)
+                    cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with median ({fill_value})")
+                
+                # Impute missing categorical values with 'Unknown'
+                elif pd.api.types.is_object_dtype(data[col]) or pd.api.types.is_categorical_dtype(data[col]):
+                    mode_value = data[col].mode()[0] if not data[col].mode().empty else 'Unknown'
+                    data[col].fillna(mode_value, inplace=True)
+                    cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with mode/Unknown ({mode_value})")
+        
+        missing_after = data.isnull().sum().sum()
+        print(f"   Missing values after cleaning: {missing_after}")
+        if missing_after < missing_before:
+            print(f"   Successfully reduced missing values by {missing_before - missing_after}")
+        elif missing_after > 0:
+            print(f"   ⚠️ Warning: {missing_after} missing values remain")
+        
+        # STEP 3: Remove Outliers (if necessary)
+        print("📈 Step 3: Assessing outliers (conservative approach)...")
+        numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
+        for col in numeric_cols:
+            Q1 = data[col].quantile(0.25)
+            Q3 = data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outliers_before = data[(data[col] < lower_bound) | (data[col] > upper_bound)].shape[0]
+            data.loc[(data[col] < lower_bound) | (data[col] > upper_bound), col] = np.nan  # Mark as NaN
+            
+            # Impute again after identifying outliers
+            if outliers_before > 0:
+                fill_value = data[col].median()  # Impute outliers with median
+                data[col].fillna(fill_value, inplace=True)
+                cleaning_log.append(f"Filled {outliers_before} outliers in '{col}' with median ({fill_value})")
+        
+        # STEP 4: Final Validation and Cleanup
+        print("✅ Step 4: Final validation...")
         empty_rows = data.isnull().all(axis=1).sum()
         if empty_rows > 0:
             data = data.dropna(how='all')
@@ -131,7 +151,7 @@ def data_cleaner(data_raw):
         print("🔄 Returning original data to prevent data loss")
         return data_raw.copy()
     
-    # MANDATORY: Data preservation validation
+    # Data preservation validation
     final_shape = data.shape
     final_rows = len(data)
     data_loss_pct = ((original_rows - final_rows) / original_rows) * 100 if original_rows > 0 else 0
@@ -147,10 +167,8 @@ def data_cleaner(data_raw):
         for action in cleaning_log:
             print(f"   • {action}")
     
-    # Critical validation checks
-    if data_loss_pct > 25:
+    if data_loss_pct > 20:
         print(f"🚨 CRITICAL WARNING: High data loss ({data_loss_pct:.1f}%)!")
-        print(f"   Consider using more conservative cleaning approaches")
     
     if final_rows == 0:
         print(f"❌ FATAL ERROR: All data was removed! Returning original data")

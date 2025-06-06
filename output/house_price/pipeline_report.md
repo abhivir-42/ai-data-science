@@ -7,81 +7,69 @@
 - Missing values: 1087
 
 ## Cleaned Data
-- Shape: (200, 75)
-- Missing values: 51
+- Shape: (200, 81)
+- Missing values: 8600
 
 ## Cleaning Steps
 # Recommended Data Cleaning Steps:
 
-Here are the recommended steps to clean and preprocess the provided house price prediction dataset:
+Given the characteristics of the dataset and the user instructions, here are the recommended steps to clean and preprocess the data for house price prediction:
 
-### Data Cleaning Steps:
-
-1. **Remove Columns with Excessive Missing Values:**
-   - Check for columns with more than 40% missing values and remove those columns. 
-   - **Reason:** These columns have insufficient data to contribute meaningfully to the analysis.
-
+1. **Remove Columns with Excessive Missing Values**:
+   * Evaluate each column for missing data. If a column has more than 40% missing values, remove it. 
    ```python
-   # Example: df.drop(columns=[col_name], inplace=True)
+   df.drop(columns=[col for col in df.columns if df[col].isnull().mean() > 0.4], inplace=True)
    ```
 
-2. **Impute Missing Numeric Values:**
-   - For numeric columns (e.g., `LotFrontage`, `MasVnrArea`), impute missing values with the mean of the column.
-   - **Reason:** This helps retain the data while minimizing distortion of the column's distribution.
-
+2. **Impute Missing Values for Numeric Columns**:
+   * For numeric columns with missing values, replace them with the mean of that column.
    ```python
-   # Example: df[numeric_col].fillna(df[numeric_col].mean(), inplace=True)
+   for col in df.select_dtypes(include=['float64', 'int64']).columns:
+       if df[col].isnull().sum() > 0:
+           df[col].fillna(df[col].mean(), inplace=True)
    ```
 
-3. **Impute Missing Categorical Values:**
-   - For categorical columns (e.g., `MasVnrType`, `FireplaceQu`, `GarageType`), impute missing values with the mode of the column.
-   - **Reason:** This maintains the categorical nature of the data and addresses missing entries in a reasonable way.
-
+3. **Impute Missing Values for Categorical Columns**:
+   * For categorical columns with missing values, fill them with the mode of that column.
    ```python
-   # Example: df[categorical_col].fillna(df[categorical_col].mode()[0], inplace=True)
+   for col in df.select_dtypes(include=['object']).columns:
+       if df[col].isnull().sum() > 0:
+           df[col].fillna(df[col].mode()[0], inplace=True)
    ```
 
-4. **Convert Columns to Correct Data Types:**
-   - Convert `GarageYrBlt` to integer or categorical as appropriate.
-   - **Reason:** Ensures that each column is in the correct format for analysis.
-
+4. **Convert Columns to the Correct Data Types**:
+   * Ensure each column is of the appropriate data type given its context (e.g., dates for time-related data). Update any incorrect data types.
    ```python
-   # Example: df['GarageYrBlt'] = df['GarageYrBlt'].astype(int)
+   df['GarageYrBlt'] = df['GarageYrBlt'].astype('Int64')  # Example for converting to nullable integer.
    ```
 
-5. **Remove Duplicate Rows:**
-   - Identify and remove duplicate rows in the DataFrame.
-   - **Reason:** Duplicates can skew the analysis and accuracy of predictions.
-
+5. **Remove Duplicate Rows**:
+   * Check for and remove any duplicate rows in the dataset.
    ```python
-   # Example: df.drop_duplicates(inplace=True)
+   df.drop_duplicates(inplace=True)
    ```
 
-6. **Remove Rows with Missing Values (if any remain):**
-   - Check if there are any rows with missing values after imputing and consider removing them.
-   - **Reason:** Ensures that all included data points are complete.
-
+6. **Remove Rows with Missing Values (if not imputed)**:
+   * This step may not be needed, as we are filling missing values. However, if any columns are excluded from filling, ensure to drop those rows.
    ```python
-   # Example: df.dropna(inplace=True)
+   df.dropna(inplace=True)  # This is optional depending on previous steps.
    ```
 
-7. **Remove Extreme Outliers:**
-   - Identify and remove any rows with extreme outliers based on a rule of 3 times the interquartile range (IQR).
-   - **Reason:** Outliers can significantly affect model performance and skew results.
-
+7. **Handle Extreme Outliers**:
+   * Identify extreme outliers using IQR and remove any rows that contain these outliers.
    ```python
-   # Example: Use IQR to filter out outliers
+   Q1 = df.quantile(0.25)
+   Q3 = df.quantile(0.75)
+   IQR = Q3 - Q1
+   df = df[~((df < (Q1 - 3 * IQR)) | (df > (Q3 + 3 * IQR))).any(axis=1)]
    ```
 
-8. **Analyze for Additional Cleaning Needs:**
-   - Perform exploratory data analysis to identify if there are any additional cleaning needs, such as highly imbalanced categorical data or other transformations.
-   - **Reason:** Tailors the cleaning process to the specific characteristics of the dataset.
+8. **Analyze Data for Additional Cleaning Needs**:
+   * Review the dataset for any other peculiarities or trends that may require additional cleaning actions not previously addressed. Examine specific columns unique to the dataset and consider additional preprocessing.
 
-### Summary of User-Specific Instructions:
-- The steps respect the user's request for basic cleaning for house price prediction, focusing on filling missing values and handling categorical data simply.
-- Any steps not included (such as saving files or unrequested operations) align with the user instructions to avoid unrelated content.
+No additional cleaning steps are specifically required beyond those mentioned given the user instructions for basic cleaning. 
 
-This structured cleaning process ensures that the dataset is adequately prepared for predictive modeling, fostering improved accuracy and efficiency in deriving insights from house prices.
+These steps should help achieve a clean and manageable dataset suitable for house price prediction modeling.
 
 ## Cleaning Function
 ```python
@@ -95,7 +83,7 @@ def data_cleaner(data_raw):
     from scipy import stats
     import warnings
     
-    # Suppress pandas warnings for clean output
+    # Suppress warnings for clean output
     warnings.filterwarnings('ignore', category=pd.errors.SettingWithCopyWarning)
     pd.set_option('mode.chained_assignment', None)
     
@@ -108,46 +96,72 @@ def data_cleaner(data_raw):
     cleaning_log = []
     
     print(f"🧹 Starting data cleaning: {original_shape[0]} rows × {original_shape[1]} columns")
-
+    
     try:
         # STEP 1: Data Type Optimization
         print("📊 Step 1: Optimizing data types...")
-        
-        # Convert object types to categories where applicable
-        for col in data.select_dtypes(include='object').columns:
-            if data[col].nunique() < 0.5 * len(data):
+        for col in data.columns:
+            # Convert string representation of numbers to numeric
+            if data[col].dtype == 'object':
+                try:
+                    data[col] = pd.to_numeric(data[col], errors='coerce')  # Convert strings to numbers if possible
+                except ValueError:
+                    continue  # Skip if it cannot be converted
+
+            # Optimize categorical columns
+            if data[col].dtype == 'object':
                 data[col] = data[col].astype('category')
 
-        # Optimize numeric columns to smaller dtypes
-        for col in data.select_dtypes(include=['int64', 'float64']).columns:
-            if pd.api.types.is_integer_dtype(data[col]):
-                data[col] = pd.to_numeric(data[col], downcast='integer')
-            else:
-                data[col] = pd.to_numeric(data[col], downcast='float')
-
+        # Re-evaluate the data types after initial conversion
+        print("   Data types optimized")
+        
         # STEP 2: Handle Missing Values (PRIORITIZE IMPUTATION)
         print("🔧 Step 2: Handling missing values...")
+        missing_before = data.isnull().sum().sum()
+        print(f"   Missing values before cleaning: {missing_before}")
         
-        # Step 2a: Remove columns with more than 40% missing values
-        missing_percentage = data.isnull().mean() * 100
-        columns_to_remove = missing_percentage[missing_percentage > 40].index
-        if len(columns_to_remove) > 0:
-            data.drop(columns=columns_to_remove, inplace=True)
-            cleaning_log.append(f"Removed columns: {list(columns_to_remove)} with > 40% missing values")
+        for col in data.columns:
+            if data[col].isnull().sum() > 0:
+                col_dtype = str(data[col].dtype)
+                missing_count = data[col].isnull().sum()
+                print(f"   Handling {missing_count} missing values in '{col}' ({col_dtype})")
+                
+                # Handle numeric columns
+                if pd.api.types.is_numeric_dtype(data[col]):
+                    if data[col].skew() > 2 or data[col].skew() < -2:  # Consider skewness
+                        fill_value = data[col].median()  # Use median for skewed data
+                        data[col] = data[col].fillna(fill_value)
+                        cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with median ({fill_value})")
+                    else:
+                        fill_value = data[col].mean()  # Use mean for normal distributions
+                        data[col] = data[col].fillna(fill_value)
+                        cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with mean ({fill_value:.2f})")
+                
+                # Handle categorical columns (CRITICAL: Safe categorical handling)
+                elif col_dtype == 'category':
+                    mode_value = data[col].mode()[0] if not data[col].mode().empty else 'Unknown'
+                    data[col] = data[col].fillna(mode_value)
+                    cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with mode ({mode_value})")
+                
+                # Handle object/string columns
+                elif col_dtype == 'object':
+                    mode_value = data[col].mode()[0] if not data[col].mode().empty else 'Unknown'
+                    data[col] = data[col].fillna(mode_value)
+                    cleaning_log.append(f"Filled {missing_count} missing values in '{col}' with mode ({mode_value})")
+                
+                # Handle datetime columns
+                elif pd.api.types.is_datetime64_any_dtype(data[col]):
+                    data[col] = data[col].fillna(method='ffill')
+                    if data[col].isnull().sum() > 0:
+                        data[col] = data[col].fillna(method='bfill')
+                    cleaning_log.append(f"Filled {missing_count} missing values in '{col}' using forward/backward fill")
         
-        # Step 2b: Impute missing numeric values with the mean
-        for numeric_col in data.select_dtypes(include=['float64', 'int64']).columns:
-            if data[numeric_col].isnull().any():
-                mean_value = data[numeric_col].mean()
-                data[numeric_col].fillna(mean_value, inplace=True)
-                cleaning_log.append(f"Imputed missing values in {numeric_col} with mean {mean_value:.2f}")
-
-        # Step 2c: Impute missing categorical values with the mode
-        for categorical_col in data.select_dtypes(include='category').columns:
-            if data[categorical_col].isnull().any():
-                mode_value = data[categorical_col].mode()[0]
-                data[categorical_col].fillna(mode_value, inplace=True)
-                cleaning_log.append(f"Imputed missing values in {categorical_col} with mode '{mode_value}'")
+        missing_after = data.isnull().sum().sum()
+        print(f"   Missing values after cleaning: {missing_after}")
+        if missing_after < missing_before:
+            print(f"   Successfully reduced missing values by {missing_before - missing_after}")
+        elif missing_after > 0:
+            print(f"   ⚠️ Warning: {missing_after} missing values remain")
         
         # STEP 3: Remove Duplicates
         print("🗑️ Step 3: Removing duplicates...")
@@ -156,10 +170,9 @@ def data_cleaner(data_raw):
             data = data.drop_duplicates()
             cleaning_log.append(f"Removed {duplicates_before} duplicate rows")
         
-        # STEP 4: Handle Outliers (CONSERVATIVE)
+        # STEP 4: Handle Outliers (**Conservative approach, if deemed necessary**)
         print("📈 Step 4: Conservative outlier handling...")
-        # Example implementation, more could be added based on domain knowledge as needed.
-        # Only commented as outlier handling is conservative and not always done.
+        # Outlier handling logic could be integrated here with caution if requested
         
         # STEP 5: Final Validation and Cleanup
         print("✅ Step 5: Final validation...")
@@ -191,8 +204,9 @@ def data_cleaner(data_raw):
             print(f"   • {action}")
     
     # Critical validation checks
-    if data_loss_pct > 25:
+    if data_loss_pct > 20:
         print(f"🚨 CRITICAL WARNING: High data loss ({data_loss_pct:.1f}%)!")
+        print(f"   Consider using more conservative cleaning approaches")
     
     if final_rows == 0:
         print(f"❌ FATAL ERROR: All data was removed! Returning original data")
