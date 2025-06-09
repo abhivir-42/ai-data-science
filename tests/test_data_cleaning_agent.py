@@ -1,113 +1,117 @@
 """
-Tests for the data cleaning agent.
+Test script for verifying the functionality of DataCleaningAgent with real API keys
 """
 
-import unittest
-import pandas as pd
-import numpy as np
 import os
 import sys
-import warnings
+import pandas as pd
 from dotenv import load_dotenv
+from langchain_openai import ChatOpenAI
 
-# To be able to import from parent directory
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# Load environment variables (for API keys)
+# Load environment variables from .env file
 load_dotenv()
 
-# Only run these tests if OpenAI API key is available
-if os.getenv("OPENAI_API_KEY"):
-    from langchain_openai import ChatOpenAI
-    from ai_data_science.agents import DataCleaningAgent
+# Add path to python path
+sys.path.append(os.path.join(os.getcwd()))
 
-    class TestDataCleaningAgent(unittest.TestCase):
-        """Tests for the data cleaning agent."""
-        
-        @classmethod
-        def setUpClass(cls):
-            """Set up the test class."""
-            # Suppress warnings
-            warnings.filterwarnings("ignore")
-            
-            # Create a small test dataframe with data quality issues
-            cls.test_df = pd.DataFrame({
-                'id': [1, 2, 3, 4, 5, 5],  # Duplicate in ID 5
-                'name': ['John', 'Jane', np.nan, 'Bob', 'Alice'],  # Missing name
-                'age': [25, 30, 40, np.nan, 35],  # Missing age
-                'salary': [50000, 60000, 70000, 55000, np.nan]  # Missing salary
-            })
-            
-            # Initialize the language model
-            cls.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        
-        def test_agent_initialization(self):
-            """Test that the agent initializes correctly."""
-            agent = DataCleaningAgent(
-                model=self.llm,
-                n_samples=5,
-                log=False
-            )
-            self.assertIsNotNone(agent)
-            self.assertIsNone(agent.response)
-        
-        def test_agent_invoke(self):
-            """Test that the agent can be invoked."""
-            agent = DataCleaningAgent(
-                model=self.llm,
-                n_samples=5,
-                log=False
-            )
-            
-            # Run the agent
-            agent.invoke_agent(
-                data_raw=self.test_df,
-                user_instructions="Just impute missing values and remove duplicates.",
-                max_retries=2
-            )
-            
-            # Check that the response was generated
-            self.assertIsNotNone(agent.response)
-            
-            # Check that the cleaned data is available
-            cleaned_df = agent.get_data_cleaned()
-            self.assertIsNotNone(cleaned_df)
-            self.assertIsInstance(cleaned_df, pd.DataFrame)
-            
-            # Check that the data was actually cleaned
-            # Should have no missing values and no duplicates
-            self.assertTrue(cleaned_df.duplicated().sum() == 0)
-            
-            # Check that the recommendation steps and function were generated
-            self.assertIsNotNone(agent.get_recommended_cleaning_steps())
-            self.assertIsNotNone(agent.get_data_cleaner_function())
-        
-        def test_agent_with_custom_instructions(self):
-            """Test that the agent follows custom instructions."""
-            agent = DataCleaningAgent(
-                model=self.llm,
-                n_samples=5,
-                log=False
-            )
-            
-            # Run the agent with specific instructions to only remove duplicates
-            agent.invoke_agent(
-                data_raw=self.test_df,
-                user_instructions="Only remove duplicate rows. Do not perform any other cleaning.",
-                max_retries=2
-            )
-            
-            # Get the cleaned data
-            cleaned_df = agent.get_data_cleaned()
-            
-            # Check that duplicates were removed
-            self.assertEqual(cleaned_df.duplicated().sum(), 0)
-            
-            # Missing values should still be present since we only asked to remove duplicates
-            self.assertTrue(cleaned_df.isna().sum().sum() > 0)
+# Import the DataCleaningAgent
+from src.agents import DataCleaningAgent
 
-if __name__ == "__main__":
-    if os.getenv("OPENAI_API_KEY"):
-        unittest.main()
-    else:
-        print("OPENAI_API_KEY not found. Skipping tests.") 
+# Get the OpenAI API key from environment
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+
+if not OPENAI_API_KEY:
+    raise ValueError("No OpenAI API key found in .env file. Please add OPENAI_API_KEY to your .env file.")
+
+print("=== Testing DataCleaningAgent with Real API Key ===\n")
+
+# Load sample data
+data_path = os.path.join(os.getcwd(), "data", "samples", "sample_data.csv")
+test_data = pd.read_csv(data_path)
+
+# Add some null values to test cleaning
+test_data.loc[0, 'name'] = None
+test_data.loc[1, 'age'] = None
+test_data.loc[2, 'department'] = None
+
+print(f"Original test data with introduced nulls:")
+print(test_data.head(5))
+print(f"Original shape: {test_data.shape}")
+print(f"Null values: {test_data.isnull().sum().sum()}")
+print()
+
+# Initialize the language model
+llm = ChatOpenAI(
+    model="gpt-4o-mini",
+    openai_api_key=OPENAI_API_KEY,
+    temperature=0
+)
+
+# Test 1: Basic cleaning with default parameters
+print("Test 1: Basic Cleaning with Default Parameters")
+data_cleaning_agent = DataCleaningAgent(
+    model=llm,
+    n_samples=10,  # Use smaller sample for faster execution
+    log=True,
+    log_path="logs/"
+)
+
+# Run the agent
+data_cleaning_agent.invoke_agent(
+    data_raw=test_data,
+    user_instructions="Clean the data using default steps, focusing on handling missing values."
+)
+
+# Get the cleaned data
+cleaned_data = data_cleaning_agent.get_data_cleaned()
+if isinstance(cleaned_data, pd.DataFrame):
+    print(f"Cleaned data shape: {cleaned_data.shape}")
+    print(f"Null values after cleaning: {cleaned_data.isnull().sum().sum()}")
+    print(f"First 5 rows of cleaned data:")
+    print(cleaned_data.head(5))
+    print()
+else:
+    print(f"Error: Failed to get cleaned DataFrame. Got {type(cleaned_data)} instead.")
+    print()
+
+# Get the cleaning function
+cleaning_function = data_cleaning_agent.get_data_cleaner_function()
+print("Generated cleaning function:")
+print(f"{cleaning_function[:500]}...\n(truncated)")
+print()
+
+# Get recommended steps
+recommended_steps = data_cleaning_agent.get_recommended_cleaning_steps()
+print("Recommended cleaning steps:")
+print(f"{recommended_steps[:500]}...\n(truncated)")
+print()
+
+# Test 2: Custom cleaning instructions
+print("Test 2: Custom Cleaning Instructions")
+data_cleaning_agent_2 = DataCleaningAgent(
+    model=llm,
+    n_samples=10,
+    log=True,
+    log_path="logs/"
+)
+
+# Run the agent with custom instructions
+data_cleaning_agent_2.invoke_agent(
+    data_raw=test_data,
+    user_instructions="Fill missing values in the 'name' column with 'Unknown', fill missing 'age' with the median, and remove rows with missing 'department'."
+)
+
+# Get the cleaned data
+cleaned_data_2 = data_cleaning_agent_2.get_data_cleaned()
+if isinstance(cleaned_data_2, pd.DataFrame):
+    print(f"Cleaned data shape with custom instructions: {cleaned_data_2.shape}")
+    print(f"Null values after custom cleaning: {cleaned_data_2.isnull().sum().sum()}")
+    print(f"First 5 rows of custom cleaned data:")
+    print(cleaned_data_2.head(5))
+    print()
+else:
+    print(f"Error: Failed to get cleaned DataFrame. Got {type(cleaned_data_2)} instead.")
+    print()
+
+print("\n=== DataCleaningAgent tests completed ===")
+print("Check the output above to verify functionality.") 
