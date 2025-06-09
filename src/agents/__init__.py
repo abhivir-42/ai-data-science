@@ -7,7 +7,7 @@ including data cleaning, data loading, and other specialized agents.
 
 from src.agents.data_cleaning_agent import DataCleaningAgent, make_data_cleaning_agent
 from src.agents.data_loader_tools_agent import DataLoaderToolsAgent, make_data_loader_tools_agent
-from src.agents.data_visualisation_agent import DataVisualizationAgent, make_data_visualization_agent
+from src.agents.data_visualisation_agent import DataVisualisationAgent, DataVisualizationAgent, make_data_visualization_agent
 
 __all__ = [
     "DataCleaningAgent", 
@@ -15,5 +15,6 @@ __all__ = [
     "DataLoaderToolsAgent",
     "make_data_loader_tools_agent",
     "DataVisualizationAgent",
+    "DataVisualisationAgent",
     "make_data_visualization_agent"
 ] 

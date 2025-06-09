@@ -42,7 +42,7 @@ LOG_PATH = os.path.join(os.getcwd(), "logs/")
 # Class
 
 
-class DataVisualizationAgent(BaseAgent):
+class DataVisualisationAgent(BaseAgent):
     """
     Creates a data visualization agent that can generate Plotly charts based on user-defined instructions or
     default visualization steps (if any). The agent generates a Python function to produce the visualization,
@@ -117,7 +117,7 @@ class DataVisualizationAgent(BaseAgent):
 
     llm = ChatOpenAI(model="gpt-4o-mini")
 
-    data_visualization_agent = DataVisualizationAgent(
+    data_visualization_agent = DataVisualisationAgent(
         model=llm,
         n_samples=30,
         log=True,
@@ -143,8 +143,8 @@ class DataVisualizationAgent(BaseAgent):
 
     Returns
     --------
-    DataVisualizationAgent : langchain.graphs.CompiledStateGraph
-        A data visualization agent implemented as a compiled state graph.
+    DataVisualisationAgent : langchain.graphs.CompiledStateGraph
+        A data visualisation agent implemented as a compiled state graph.
     """
 
     def __init__(
@@ -807,4 +807,8 @@ def make_data_visualization_agent(
         agent_name=AGENT_NAME,
     )
 
-    return app 
+    return app
+
+
+# Backward compatibility alias for existing code
+DataVisualizationAgent = DataVisualisationAgent 
