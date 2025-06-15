@@ -1,0 +1,16 @@
+streamlit
+openai
+langchain
+langchain-openai
+langchain-community
+langgraph
+pandas
+plotly
+matplotlib
+numpy
+missingno
+sweetviz
+dtale
+pytimetk
+pillow
+openpyxl 

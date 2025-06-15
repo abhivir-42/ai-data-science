@@ -1,0 +1,308 @@
+
+Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
+
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://192.168.1.193:8501
+  External URL: http://45.148.12.139:8501
+
+  For better performance, install the Watchdog module:
+
+  $ xcode-select --install
+  $ pip install watchdog
+            
+2025-06-10 08:07:06.223 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:07:40.163 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:16:51,330 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:16:51.348 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:18:00,856 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:18:02,394 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * Tool: describe_dataset
+    * POST-PROCESSING EDA RESULTS
+Tool Name: describe_dataset
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * POST-PROCESSING EDA RESULTS
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * Tool: generate_dtale_report
+    * POST-PROCESSING EDA RESULTS
+Tool Name: generate_dtale_report
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * Tool: generate_sweetviz_report
+                                             |          | [  0%]   00:00 -> (? left)[Summarizing dataframe]                      |          | [  0%]   00:00 -> (? left)Feature: customerID                          |▍         | [  5%]   00:00 -> (00:00 left)Feature: gender                              |▉         | [  9%]   00:00 -> (00:00 left)Feature: gender                              |█▎        | [ 14%]   00:00 -> (00:01 left)Feature: SeniorCitizen                       |█▎        | [ 14%]   00:00 -> (00:01 left)Feature: Partner                             |█▊        | [ 18%]   00:00 -> (00:00 left)Feature: Partner                             |██▎       | [ 23%]   00:00 -> (00:00 left)Feature: Dependents                          |██▎       | [ 23%]   00:00 -> (00:00 left)Feature: tenure                              |██▋       | [ 27%]   00:00 -> (00:00 left)2025-06-10 08:18:04,450 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+Feature: tenure                              |██▋       | [ 27%]   00:01 -> (00:04 left)
+    * Tool: generate_sweetviz_report
+                                             |          | [  0%]   00:00 -> (? left)[Summarizing dataframe]                      |          | [  0%]   00:00 -> (? left)Feature: customerID                          |▍         | [  5%]   00:00 -> (00:00 left)Feature: gender                              |▉         | [  9%]   00:00 -> (00:00 left)Feature: SeniorCitizen                       |█▎        | [ 14%]   00:00 -> (00:00 left)Feature: SeniorCitizen                       |█▊        | [ 18%]   00:00 -> (00:00 left)Feature: Partner                             |█▊        | [ 18%]   00:00 -> (00:00 left)Feature: Dependents                          |██▎       | [ 23%]   00:00 -> (00:00 left)Feature: tenure                              |██▋       | [ 27%]   00:00 -> (00:00 left)2025-06-10 08:18:06,486 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:18:06.494 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+Feature: tenure                              |██▋       | [ 27%]   00:01 -> (00:05 left)
+2025-06-10 08:27:13,721 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:27:14,638 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:27:25,901 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:27:25.908 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:29:26,942 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:29:30,932 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:29:30.939 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:31:29,818 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:31:32,175 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+    * POST-PROCESSING EDA RESULTS
+Tool Name: generate_sweetviz_report
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * Tool: explain_data
+    * POST-PROCESSING EDA RESULTS
+Tool Name: explain_data
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * POST-PROCESSING EDA RESULTS
+---EXPLORATORY DATA ANALYST AGENT----
+    * RUN REACT TOOL-CALLING AGENT FOR EDA
+    * Tool: visualise_missing
+    * Tool: describe_dataset
+    * Tool: generate_sweetviz_report
+                                             |          | [  0%]   00:00 -> (? left)[Summarizing dataframe]                      |          | [  0%]   00:00 -> (? left)/Users/abhivir42/projects/fetch/ai-data-science/apps/exploratory-copilot-app/../../src/tools/eda.py:134: UserWarning:
+
+This figure includes Axes that are not compatible with tight_layout, so results might be incorrect.
+
+Feature: customerID                          |▍         | [  5%]   00:00 -> (00:01 left)Feature: customerID                          |▉         | [  9%]   00:00 -> (00:01 left)Feature: gender                              |▉         | [  9%]   00:00 -> (00:01 left)Feature: SeniorCitizen                       |█▎        | [ 14%]   00:00 -> (00:01 left)Feature: SeniorCitizen                       |█▊        | [ 18%]   00:00 -> (00:02 left)Feature: Partner                             |█▊        | [ 18%]   00:00 -> (00:02 left)Feature: Dependents                          |██▎       | [ 23%]   00:00 -> (00:01 left)/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/seaborn/matrix.py:309: UserWarning:
+
+Attempting to set identical low and high xlims makes transformation singular; automatically expanding.
+
+/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/seaborn/matrix.py:309: UserWarning:
+
+Attempting to set identical low and high ylims makes transformation singular; automatically expanding.
+
+Feature: Dependents                          |██▋       | [ 27%]   00:00 -> (00:01 left)Feature: tenure                              |██▋       | [ 27%]   00:00 -> (00:01 left)2025-06-10 08:31:34,903 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:31:34.914 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+Feature: tenure                              |██▋       | [ 27%]   00:02 -> (00:06 left)
+2025-06-10 08:31:34.931 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:32:09,344 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:32:11,598 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:32:24,175 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:32:25,832 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:32:28,602 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:32:28.609 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:32:28.626 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:34:02,599 - INFO     - HTTP Request: GET https://api.openai.com/v1/models "HTTP/1.1 200 OK"
+2025-06-10 08:34:03,728 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:34:04,956 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:34:05,979 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:34:07,824 - INFO     - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-06-10 08:34:07.831 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 08:34:07.842 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/streamlit/dataframe_util.py", line 822, in convert_pandas_df_to_arrow_bytes
+    table = pa.Table.from_pandas(df)
+  File "pyarrow/table.pxi", line 4793, in pyarrow.lib.Table.from_pandas
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 639, in <listcomp>
+    arrays = [convert_column(c, f)
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 626, in convert_column
+    raise e
+  File "/Users/abhivir42/projects/ai-ds-venv/lib/python3.10/site-packages/pyarrow/pandas_compat.py", line 620, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 365, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 90, in pyarrow.lib._ndarray_to_array
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowInvalid: ("Could not convert '7590-VHVEG' with type str: tried to convert to int64", 'Conversion failed for column customerID with type object')
+2025-06-10 15:49:09,050 - INFO     - Executing shutdown due to inactivity...
+2025-06-10 15:49:09,079 - INFO     - Executing shutdown...
+2025-06-10 15:49:09,079 - INFO     - Not running with the Werkzeug Server, exiting by searching gc for BaseWSGIServer
+2025-06-10 15:49:09.187 Thread 'Thread-193 (process_request_thread)': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-06-10 15:49:09.187 Thread 'Thread-193 (process_request_thread)': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2025-06-10 15:49:09.187 Please replace `st.experimental_user` with `st.user`.
+
+`st.experimental_user` will be removed after 2025-11-06.
+2025-06-10 15:49:09,194 - ERROR    - 
+
+OpenAI error:
+
+    missing `sounddevice`
+
+This feature requires additional dependencies:
+
+    $ pip install openai[voice_helpers]
+
+
