@@ -30,6 +30,10 @@ from src.tools import (
     list_directory_recursive,
     get_file_info,
     search_files_by_pattern,
+    extract_pdf_text,
+    extract_pdf_tables,
+    smart_extract_data_from_pdf,
+    get_pdf_info,
 )
 from src.utils.messages import get_tool_call_names
 
@@ -44,6 +48,10 @@ tools = [
     list_directory_recursive,
     get_file_info,
     search_files_by_pattern,
+    extract_pdf_text,
+    extract_pdf_tables,
+    smart_extract_data_from_pdf,
+    get_pdf_info,
 ]
 
 class DataLoaderToolsAgent(BaseAgent):
@@ -55,6 +63,7 @@ class DataLoaderToolsAgent(BaseAgent):
     - Excel files
     - JSON data
     - Parquet files
+    - PDF documents (text and table extraction)
     
     Parameters
     ----------

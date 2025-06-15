@@ -22,4 +22,9 @@ sweetviz
 dtale
 pytimetk
 matplotlib
-pillow 
+pillow
+# PDF processing dependencies
+pdfplumber>=0.7.0
+tabula-py>=2.5.0
+PyPDF2>=3.0.0
+pdfminer.six>=20220524 

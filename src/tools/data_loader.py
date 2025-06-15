@@ -264,6 +264,23 @@ def _load_file_impl(file_path: str, max_tokens: int = 150000, **kwargs) -> Dict[
             df = pd.read_parquet(file_path, **kwargs)
         elif file_ext == '.txt':
             df = pd.read_csv(file_path, sep='\t', **kwargs)
+        elif file_ext == '.pdf':
+            # Handle PDF files using PDF processor tools
+            from src.tools.pdf_processor import smart_extract_data_from_pdf
+            pdf_result = smart_extract_data_from_pdf(file_path)
+            
+            if "error" in pdf_result:
+                return pdf_result
+            
+            # If we found structured data (tables), use the first table as the main DataFrame
+            if pdf_result["structured_data"]:
+                first_table = pdf_result["structured_data"][0]
+                if first_table.get("data"):
+                    df = pd.DataFrame.from_dict(first_table["data"])
+                else:
+                    return {"error": "PDF contains no extractable tabular data"}
+            else:
+                return {"error": "No structured data found in PDF"}
         else:
             return {"error": f"Unsupported file format: {file_ext}"}
         

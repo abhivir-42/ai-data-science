@@ -24,6 +24,13 @@ from src.tools.eda import (
     generate_dtale_report,
 )
 
+from src.tools.pdf_processor import (
+    extract_pdf_text,
+    extract_pdf_tables,
+    smart_extract_data_from_pdf,
+    get_pdf_info
+)
+
 __all__ = [
     "get_dataframe_summary",
     "load_file",
@@ -38,4 +45,8 @@ __all__ = [
     "generate_correlation_funnel",
     "generate_sweetviz_report",
     "generate_dtale_report",
+    "extract_pdf_text",
+    "extract_pdf_tables",
+    "smart_extract_data_from_pdf",
+    "get_pdf_info",
 ] 
