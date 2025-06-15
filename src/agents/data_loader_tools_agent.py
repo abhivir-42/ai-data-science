@@ -62,7 +62,6 @@ class DataLoaderToolsAgent(BaseAgent):
     - CSV files (local or remote)
     - Excel files
     - JSON data
-    - Parquet files
     - PDF documents (text and table extraction)
     
     Parameters
