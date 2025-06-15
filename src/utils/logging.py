@@ -1,67 +1,61 @@
-"""
-Logging utilities for AI Data Science.
-"""
 
 import os
-import datetime
-import uuid
 
-def log_ai_function(response: str, file_name: str = None, log: bool = False, log_path: str = None, overwrite: bool = True) -> tuple:
+def log_ai_function(response: str, file_name: str, log: bool = True, log_path: str = './logs/', overwrite: bool = True):
     """
-    Log an AI-generated function to a file.
+    Logs the response of an AI function to a file.
     
     Parameters
     ----------
     response : str
-        The function code to log.
-    file_name : str, optional
-        The name of the file to save the code to.
+        The response of the AI function.
+    file_name : str
+        The name of the file to save the response to.
     log : bool, optional
-        Whether to log the code. If False, returns empty strings.
+        Whether to log the response or not. The default is True.
     log_path : str, optional
-        The path to the directory to save the log file in.
+        The path to save the log file. The default is './logs/'.
     overwrite : bool, optional
-        Whether to overwrite an existing file with the same name.
-        
+        Whether to overwrite the file if it already exists. The default is True.
+        - If True, the file will be overwritten. 
+        - If False, a unique file name will be created.
+    
     Returns
     -------
     tuple
-        A tuple containing the file path and file name.
+        The path and name of the log file.    
     """
-    if not log:
-        return "", ""
-        
-    if not log_path:
-        log_path = "logs"
     
-    # Remove redundant path components - avoid logs/logs/file.py
-    if log_path.startswith("logs") and os.path.join(os.getcwd(), "logs") == os.path.abspath(log_path):
-        log_path = "logs"
-    elif os.path.basename(log_path) == "logs" and os.path.dirname(log_path) == "logs":
-        log_path = "logs"
-    
-    # Ensure the logs directory exists
-    if not os.path.exists(log_path):
+    if log:
+        # Ensure the directory exists
         os.makedirs(log_path, exist_ok=True)
-        
-    if not file_name:
-        file_name = f"ai_function_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.py"
-    elif not file_name.endswith('.py'):
-        file_name += '.py'
-        
-    file_path = os.path.join(log_path, file_name)
-    
-    # If not overwriting and file exists, create a unique name
-    if not overwrite and os.path.exists(file_path):
-        base_name, ext = os.path.splitext(file_name)
-        unique_id = str(uuid.uuid4())[:8]
-        file_name = f"{base_name}_{unique_id}{ext}"
+
+        # file_name = 'data_wrangler.py'
         file_path = os.path.join(log_path, file_name)
-    
-    # Create directory if it doesn't exist (handles nested paths)
-    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
-    
-    with open(file_path, 'w') as f:
-        f.write(response)
+
+        if not overwrite:
+            # If file already exists and we're NOT overwriting, we create a new name
+            if os.path.exists(file_path):
+                # Use an incremental suffix (e.g., data_wrangler_1.py, data_wrangler_2.py, etc.)
+                # or a time-based suffix if you prefer.
+                base_name, ext = os.path.splitext(file_name)
+                i = 1
+                while True:
+                    new_file_name = f"{base_name}_{i}{ext}"
+                    new_file_path = os.path.join(log_path, new_file_name)
+                    if not os.path.exists(new_file_path):
+                        file_path = new_file_path
+                        file_name = new_file_name
+                        break
+                    i += 1
+
+        # Write the file
+        with open(file_path, 'w', encoding='utf-8') as file:
+            file.write(response)
+
+        print(f"      File saved to: {file_path}")
         
-    return file_path, file_name 
+        return (file_path, file_name)
+    
+    else:
+        return (None, None)
