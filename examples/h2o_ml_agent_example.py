@@ -13,8 +13,12 @@ Requirements:
 
 import os
 import pandas as pd
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from src.agents.ml_agents import H2OMLAgent
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Set up paths
 LOG_PATH = "logs/"
