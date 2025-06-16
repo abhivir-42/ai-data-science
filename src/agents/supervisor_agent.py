@@ -154,6 +154,10 @@ class SupervisorAgent:
             r"predict\s+['\"]?(\w+)['\"]?",
             r"target\s*=\s*['\"]?(\w+)['\"]?",
             r"on\s+['\"]?(\w+)['\"]?",
+            r"to\s+predict\s+['\"]?(\w+)['\"]?",
+            r"predicting\s+['\"]?(\w+)['\"]?",
+            r"classification\s+model\s+to\s+predict\s+['\"]?(\w+)['\"]?",
+            r"regression\s+model\s+to\s+predict\s+['\"]?(\w+)['\"]?"
         ]
         
         for pattern in target_patterns:
@@ -315,6 +319,8 @@ class SupervisorAgent:
                 
                 if target_variable is None:
                     results['reports']['ml_error'] = "ML modeling requested but no target variable specified or detected."
+                elif target_variable not in current_df.columns:
+                    results['reports']['ml_error'] = f"Target variable '{target_variable}' not found in dataset columns: {list(current_df.columns)}"
                 else:
                     self.h2o_ml_agent.invoke_agent(
                         data_raw=current_df,
