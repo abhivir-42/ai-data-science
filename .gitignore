@@ -54,9 +54,19 @@ coverage.xml
 # Logs
 logs/
 debug_logs/
+*.log
 
 # OS specific
 .DS_Store 
+
+# Output directories and generated files
+output/
+models/
+demo/output/
+demo/h2o_models/
+*.json
+agent*_data.json
+temp_data_*.csv
 
 # Supplementary folders & files
 ai-data-science-team/explanation/
