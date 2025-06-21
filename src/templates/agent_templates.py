@@ -533,7 +533,32 @@ def node_func_execute_agent_code_on_data(
     
     # Execute the code snippet to define the agent function
     local_vars = {}
-    global_vars = {}
+    global_vars = {
+        '__builtins__': __builtins__,
+        'pd': pd,
+        'pandas': pd,
+    }
+    
+    # Add common ML/data science imports to global scope
+    try:
+        import h2o
+        global_vars['h2o'] = h2o
+    except ImportError:
+        pass
+    
+    try:
+        import mlflow
+        global_vars['mlflow'] = mlflow
+    except ImportError:
+        pass
+        
+    try:
+        import numpy as np
+        global_vars['np'] = np
+        global_vars['numpy'] = np
+    except ImportError:
+        pass
+    
     exec(agent_code, global_vars, local_vars)
     
     # Retrieve the agent function from the executed code
@@ -619,7 +644,32 @@ def node_func_execute_agent_from_sql_connection(
     
     # Execute the code snippet to define the agent function
     local_vars = {}
-    global_vars = {}
+    global_vars = {
+        '__builtins__': __builtins__,
+        'pd': pd,
+        'pandas': pd,
+    }
+    
+    # Add common ML/data science imports to global scope
+    try:
+        import h2o
+        global_vars['h2o'] = h2o
+    except ImportError:
+        pass
+    
+    try:
+        import mlflow
+        global_vars['mlflow'] = mlflow
+    except ImportError:
+        pass
+        
+    try:
+        import numpy as np
+        global_vars['np'] = np
+        global_vars['numpy'] = np
+    except ImportError:
+        pass
+    
     exec(agent_code, global_vars, local_vars)
     
     # Retrieve the agent function from the executed code
