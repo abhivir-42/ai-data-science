@@ -1,7 +1,12 @@
 """
-Output parsers for AI Data Science.
+Parsers package for intelligent data analysis workflow parsing.
+
+This package contains LLM-powered parsers that use structured outputs
+to intelligently interpret user requests and extract workflow requirements.
 """
 
-from src.parsers.parsers import PythonOutputParser, SQLOutputParser
+from .intent_parser import DataAnalysisIntentParser
 
-__all__ = ["PythonOutputParser", "SQLOutputParser"] 
+__all__ = [
+    "DataAnalysisIntentParser"
+] 
