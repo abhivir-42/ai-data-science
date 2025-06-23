@@ -322,7 +322,12 @@ class DataAnalysisAgent:
             
             # Execute agent
             logger.info("Executing data cleaning agent...")
-            result_str = self.data_cleaning_agent.run(**params)
+            result_dict = self.data_cleaning_agent.invoke_agent(
+                data_raw=data_path,  # This will be a URL, agent should handle it
+                user_instructions=params["user_instructions"],
+                max_retries=3
+            )
+            result_str = str(result_dict)
             
             # Parse result and create metrics
             output_path = self._find_output_file(params["file_name"])
@@ -381,7 +386,12 @@ class DataAnalysisAgent:
             
             # Execute agent
             logger.info("Executing feature engineering agent...")
-            result_str = self.feature_engineering_agent.run(**params)
+            result_dict = self.feature_engineering_agent.invoke_agent(
+                data_raw=data_path,
+                user_instructions=params["user_instructions"],
+                max_retries=3
+            )
+            result_str = str(result_dict)
             
             # Parse result and create metrics
             output_path = self._find_output_file(params["file_name"])
@@ -440,7 +450,12 @@ class DataAnalysisAgent:
             
             # Execute agent
             logger.info("Executing H2O ML agent...")
-            result_str = self.h2o_ml_agent.run(**params)
+            result_dict = self.h2o_ml_agent.invoke_agent(
+                data_raw=data_path,
+                user_instructions=params["user_instructions"],
+                max_retries=3
+            )
+            result_str = str(result_dict)
             
             # Parse result and create metrics
             ml_metrics = self._extract_ml_metrics(result_str, params)
@@ -655,7 +670,7 @@ class DataAnalysisAgent:
             total_runtime_seconds=time.time() - (self.execution_start_time or time.time()),
             original_request=user_request,
             csv_url=csv_url,
-            data_shape={"rows": "unknown", "columns": "unknown"},
+            data_shape={"rows": 0, "columns": 0},
             workflow_intent=WorkflowIntent(
                 needs_data_cleaning=True,
                 needs_feature_engineering=True,

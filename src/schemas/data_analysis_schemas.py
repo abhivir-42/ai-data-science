@@ -254,18 +254,18 @@ class AgentExecutionResult(BaseModel):
     success: bool = Field(description="Whether the agent executed successfully")
     
     # Agent-specific metrics
-    data_quality_metrics: Optional[DataQualityMetrics] = Field(description="Data cleaning metrics")
-    feature_engineering_metrics: Optional[FeatureEngineeringMetrics] = Field(description="Feature engineering metrics")
-    ml_modeling_metrics: Optional[MLModelingMetrics] = Field(description="ML modeling metrics")
+    data_quality_metrics: Optional[DataQualityMetrics] = Field(default=None, description="Data cleaning metrics")
+    feature_engineering_metrics: Optional[FeatureEngineeringMetrics] = Field(default=None, description="Feature engineering metrics")
+    ml_modeling_metrics: Optional[MLModelingMetrics] = Field(default=None, description="ML modeling metrics")
     
     # Outputs
-    output_data_path: Optional[str] = Field(description="Path to output data file")
-    model_path: Optional[str] = Field(description="Path to saved model")
+    output_data_path: Optional[str] = Field(default=None, description="Path to output data file")
+    model_path: Optional[str] = Field(default=None, description="Path to saved model")
     artifacts_paths: Dict[str, str] = Field(default_factory=dict, description="Paths to generated artifacts")
     
     # Logs and Messages
     log_messages: List[str] = Field(default_factory=list, description="Log messages from agent execution")
-    error_message: Optional[str] = Field(description="Error message if execution failed")
+    error_message: Optional[str] = Field(default=None, description="Error message if execution failed")
     warnings: List[str] = Field(default_factory=list, description="Warning messages")
 
 
@@ -286,7 +286,7 @@ class DataAnalysisResult(BaseModel):
     # Input Summary
     original_request: str = Field(description="Original user request")
     csv_url: str = Field(description="Source CSV URL")
-    data_shape: Dict[str, int] = Field(description="Original data dimensions")
+    data_shape: Dict[str, Any] = Field(description="Original data dimensions")
     
     # Workflow Execution
     workflow_intent: WorkflowIntent = Field(description="Parsed workflow requirements")
