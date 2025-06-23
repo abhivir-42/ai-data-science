@@ -1,432 +1,477 @@
 # Enhanced Data Analysis Agent with Structured Outputs - Implementation Plan
 
-## Overview
-Create a new `data_analysis_agent` that improves upon the current supervisor agent by implementing structured outputs and schema definitions using LangChain's structured output capabilities. This agent will orchestrate `data_cleaning_agent`, `feature_engineering_agent`, and `h2o_ml_agent` with better parameter handling and user intent parsing.
+## 🎯 **EXECUTIVE SUMMARY**
+Replace the current `supervisor_agent.py` with a sophisticated `data_analysis_agent` that uses LangChain's structured outputs for intelligent workflow orchestration. This addresses critical limitations in intent parsing, parameter utilization, and output structure.
 
-## ⚠️ CRITICAL ANALYSIS: Current Issues Identified
+## 🔍 **CRITICAL ANALYSIS: Current vs. Enhanced Architecture**
 
-### 1. **Current Supervisor Agent Limitations** 
-After analyzing `data_cleaning_agent.py`, `feature_engineering_agent.py`, and `h2o_ml_agent.py`:
+### **❌ Current Supervisor Agent Critical Flaws:**
+After deep analysis of `supervisor_agent.py` and the individual agents:
 
-**❌ Parameter Mapping Issues:**
-- Current agent uses basic string parsing, ignoring complex parameter structures
-- **Data Cleaning Agent** has 11+ parameters: `model`, `n_samples`, `log`, `log_path`, `file_name`, `function_name`, `overwrite`, `human_in_the_loop`, `bypass_recommended_steps`, `bypass_explain_code`, `checkpointer`
-- **Feature Engineering Agent** has similar + `target_variable` support
-- **H2O ML Agent** has 15+ parameters including MLflow integration: `enable_mlflow`, `mlflow_tracking_uri`, `mlflow_experiment_name`, `mlflow_run_name`, `model_directory`
+1. **Fragile Intent Parsing (Lines 103-145)**:
+   ```python
+   # Current: Basic keyword matching
+   cleaning_keywords = ['clean', 'preprocess', 'missing']
+   needs['data_cleaning'] = any(keyword in request_lower for keyword in cleaning_keywords)
+   ```
+   **Problem**: Misses complex requests like "I need help with data quality issues and want to build a predictive model"
 
-**❌ Target Variable Detection:**
-- Current regex-based parsing is unreliable and fragile
-- No confidence scoring or validation
-- Cannot handle ambiguous cases or multiple potential targets
+2. **Massive Parameter Under-utilization**:
+   - **Data Cleaning Agent**: Only uses `user_instructions`, ignores 10+ parameters like `n_samples`, `human_in_the_loop`, `bypass_recommended_steps`
+   - **Feature Engineering Agent**: Missing `target_variable` intelligence, datetime handling parameters
+   - **H2O ML Agent**: Ignores MLflow integration, model directory settings, 15+ ML parameters
 
-**❌ Output Limitations:**
-- Basic string concatenation instead of structured data
-- Missing critical information like execution times, error handling, and metadata
-- No integration with actual agent response structures
+3. **Poor Target Variable Extraction (Lines 147-174)**:
+   ```python
+   # Current: Fragile regex patterns
+   target_patterns = [r"target\s+(?:variable\s+)?['\"]?(\w+)['\"]?"]
+   ```
+   **Problem**: Fails on complex requests, doesn't understand data context
 
-**❌ Workflow Orchestration:**
-- Simple if/else logic instead of intelligent workflow planning
-- No error recovery or partial failure handling
-- No consideration of data dependencies between agents
+4. **Restrictive Output Structure**: Simple string concatenation doesn't capture rich agent outputs
 
-### 2. **Required Improvements**
+### **✅ Enhanced Architecture Solution:**
+- **LLM-powered Intent Parsing** with structured schemas
+- **Complete Parameter Mapping** for all 35+ agent parameters
+- **Intelligent Data Analysis** with context-aware decisions
+- **Rich Structured Outputs** capturing full workflow results
 
-**✅ Enhanced Schema Design:**
-- Map to actual agent parameter structures
-- Provide intelligent defaults based on analysis
-- Support all agent-specific features (MLflow, logging, human-in-the-loop)
+## 📋 **STEP-BY-STEP IMPLEMENTATION PLAN**
 
-**✅ Advanced Intent Parsing:**
-- Use LLM-based structured output parsing
-- Confidence scoring for target variable detection
-- Intelligent parameter mapping based on user preferences
+### **Step 1: Schema Design & Validation Infrastructure**
+**Files**: `src/schemas/data_analysis_schemas.py`
 
-**✅ Comprehensive Output Structure:**
-- Capture all agent outputs in structured format
-- Include execution metadata, timing, and quality metrics
-- Support visualization and reporting capabilities
-
-**✅ Robust Workflow Management:**
-- Error handling and recovery mechanisms
-- Partial result preservation
-- Performance optimization based on user preferences
-
-## Key Improvements
-1. **Structured Input Schema**: Define comprehensive input schemas for user requests
-2. **Enhanced Parameter Extraction**: Use LLM-based parsing instead of regex
-3. **Comprehensive Output Schema**: Structured outputs that capture all agent capabilities
-4. **Better Workflow Orchestration**: Smart sequencing based on actual user needs
-5. **Default Value Handling**: Intelligent defaults when user doesn't specify parameters
-
-## Step-by-Step Implementation Plan
-
-### Step 1: Schema Definition and Validation
-**Files to create/modify:**
-- `src/schemas/data_analysis_schemas.py` (new)
-
-**Tasks:**
-- Define Pydantic schemas for user input validation
-- Create comprehensive parameter schemas for each agent
-- Define structured output schemas for the final report
-- Include default values and validation rules
-
-**Schema Components:**
-- `UserRequest`: Main input schema with CSV URL and natural language request
-- `DataCleaningParams`: Parameters for data cleaning agent
-- `FeatureEngineeringParams`: Parameters for feature engineering agent  
-- `MLParams`: Parameters for H2O ML agent
-- `AnalysisReport`: Comprehensive structured output schema
-
-### Step 2: Enhanced User Intent Parser
-**Files to create/modify:**
-- `src/parsers/intent_parser.py` (new)
-
-**Tasks:**
-- Create LLM-based intent parser using structured outputs
-- Replace regex-based parsing with AI-powered parameter extraction
-- Implement smart target variable detection
-- Add dataset type and problem type detection
-
-### Step 3: Create Enhanced Data Analysis Agent
-**Files to create/modify:**
-- `src/agents/data_analysis_agent.py` (new)
-
-**Tasks:**
-- Implement new supervisor agent class with structured outputs
-- Integrate schema validation and parameter extraction
-- Create workflow orchestration logic based on parsed intent
-- Implement comprehensive error handling and recovery
-
-### Step 4: Agent Parameter Mapping
-**Files to create/modify:**
-- `src/utils/parameter_mapper.py` (new)
-
-**Tasks:**
-- Create utility functions to map parsed parameters to agent-specific parameters
-- Handle default values and parameter validation
-- Implement parameter transformation and normalization
-
-### Step 5: Structured Report Generation
-**Files to create/modify:**
-- `src/templates/report_templates.py` (new)
-
-**Tasks:**
-- Create comprehensive report templates
-- Implement structured output formatting
-- Add markdown and JSON export capabilities
-- Include visualizations and summaries
-
-### Step 6: Enhanced Testing and Validation
-**Files to create/modify:**
-- `tests/test_data_analysis_agent.py` (new)
-- `tests/test_intent_parser.py` (new)
-
-**Tasks:**
-- Create comprehensive test suite
-- Add validation tests for schemas
-- Test with multiple dataset types and request formats
-- Validate structured outputs
-
-### Step 7: Integration and Documentation
-**Files to create/modify:**
-- `examples/structured_data_analysis_example.py` (new)
-- Update existing documentation
-
-**Tasks:**
-- Create working examples
-- Update API documentation  
-- Add usage guides and best practices
-
-## Detailed Schema Design
-
-Based on analysis of existing agents, here are comprehensive schemas that map to actual agent capabilities:
-
-### Enhanced Input Schema
+#### **1.1 Input Schema Design**
 ```python
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict, Union, Any
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal, Dict, Any
 from enum import Enum
 
-class ProblemType(str, Enum):
-    AUTO = "auto"
-    CLASSIFICATION = "classification"
-    REGRESSION = "regression"
-    CLUSTERING = "clustering"
-
-class ImputationStrategy(str, Enum):
-    MEAN = "mean"
-    MEDIAN = "median"
-    MODE = "mode"
-    FORWARD_FILL = "ffill"
-    BACKWARD_FILL = "bfill"
-
-class EncodingStrategy(str, Enum):
-    ONEHOT = "onehot"
-    LABEL = "label"
-    TARGET = "target"
-    ORDINAL = "ordinal"
-
-class UserRequest(BaseModel):
-    """Main user input schema with comprehensive validation"""
-    model_config = ConfigDict(
-        str_strip_whitespace=True,
-        validate_assignment=True,
-        extra="forbid"
-    )
+class DataAnalysisRequest(BaseModel):
+    """Complete structured input for data analysis workflows"""
+    csv_url: str = Field(description="URL to CSV file for analysis")
+    user_request: str = Field(description="Natural language analysis request")
     
-    csv_url: str = Field(
-        description="URL to CSV file or path to local file",
-        min_length=1
-    )
-    user_request: str = Field(
-        description="Natural language analysis request",
-        min_length=10,
-        max_length=2000
-    )
-    target_variable: Optional[str] = Field(
-        default=None,
-        description="Target variable for ML (auto-detected if not provided)"
-    )
-    problem_type: ProblemType = Field(
-        default=ProblemType.AUTO,
-        description="Type of ML problem"
-    )
-    max_runtime: int = Field(
-        default=300,
-        ge=30,
-        le=3600,
-        description="Max runtime in seconds for entire analysis"
-    )
-
-class DataCleaningParams(BaseModel):
-    """Enhanced data cleaning parameters based on actual agent capabilities"""
-    model_config = ConfigDict(validate_assignment=True)
+    # Advanced Configuration
+    target_variable: Optional[str] = Field(default=None, description="Target variable for ML modeling")
+    problem_type: Optional[Literal["classification", "regression", "auto"]] = Field(default="auto")
+    max_runtime_seconds: Optional[int] = Field(default=300, description="Maximum runtime per agent")
     
-    # Core parameters that match DataCleaningAgent
-    n_samples: int = Field(default=30, ge=10, le=1000, description="Samples for data summary")
-    log: bool = Field(default=True, description="Enable logging")
-    file_name: str = Field(default="data_cleaner.py", description="Function file name")
-    function_name: str = Field(default="data_cleaner", description="Function name")
-    overwrite: bool = Field(default=True, description="Overwrite existing files")
-    human_in_the_loop: bool = Field(default=False, description="Enable human review")
-    bypass_recommended_steps: bool = Field(default=False, description="Skip recommendation step")
-    bypass_explain_code: bool = Field(default=False, description="Skip code explanation")
+    # Data Cleaning Preferences
+    missing_threshold: Optional[float] = Field(default=0.4, description="Threshold for removing columns with missing values")
+    outlier_detection: Optional[bool] = Field(default=True, description="Enable outlier detection and removal")
     
-    # Cleaning-specific parameters
-    remove_missing_threshold: float = Field(
-        default=0.4, ge=0.0, le=1.0,
-        description="Threshold for removing columns with missing values"
-    )
-    imputation_strategy: ImputationStrategy = Field(
-        default=ImputationStrategy.MEAN,
-        description="Strategy for imputing missing values"
-    )
-    remove_outliers: bool = Field(default=True, description="Remove outliers using IQR method")
-    remove_duplicates: bool = Field(default=True, description="Remove duplicate rows")
-    convert_data_types: bool = Field(default=True, description="Optimize data types")
-
-class FeatureEngineeringParams(BaseModel):
-    """Enhanced feature engineering parameters"""
-    model_config = ConfigDict(validate_assignment=True)
+    # Feature Engineering Preferences  
+    feature_selection: Optional[bool] = Field(default=True, description="Enable automatic feature selection")
+    datetime_features: Optional[bool] = Field(default=True, description="Generate datetime-based features")
     
-    # Core parameters that match FeatureEngineeringAgent
-    n_samples: int = Field(default=30, ge=10, le=1000)
-    log: bool = Field(default=True)
-    file_name: str = Field(default="feature_engineer.py")
-    function_name: str = Field(default="feature_engineer")
-    overwrite: bool = Field(default=True)
-    human_in_the_loop: bool = Field(default=False)
-    bypass_recommended_steps: bool = Field(default=False)
-    bypass_explain_code: bool = Field(default=False)
-    
-    # Feature engineering specific
-    encoding_strategy: EncodingStrategy = Field(default=EncodingStrategy.ONEHOT)
-    scale_features: bool = Field(default=False, description="Scale numerical features")
-    create_polynomial_features: bool = Field(default=False)
-    feature_selection: bool = Field(default=False)
-    high_cardinality_threshold: float = Field(
-        default=0.05, ge=0.01, le=0.5,
-        description="Threshold for high cardinality encoding"
-    )
-    remove_constant_features: bool = Field(default=True)
-    create_datetime_features: bool = Field(default=True)
-
-class MLParams(BaseModel):
-    """H2O ML parameters based on actual agent"""
-    model_config = ConfigDict(validate_assignment=True)
-    
-    # Core parameters matching H2OMLAgent
-    n_samples: int = Field(default=30, ge=10, le=1000)
-    log: bool = Field(default=True)
-    file_name: str = Field(default="h2o_automl.py")
-    function_name: str = Field(default="h2o_automl")
-    overwrite: bool = Field(default=True)
-    human_in_the_loop: bool = Field(default=False)
-    bypass_recommended_steps: bool = Field(default=False)
-    bypass_explain_code: bool = Field(default=False)
-    
-    # H2O-specific parameters
-    max_models: int = Field(default=20, ge=1, le=100, description="Maximum models to train")
-    max_runtime_secs: int = Field(default=300, ge=30, le=3600, description="AutoML runtime")
-    nfolds: int = Field(default=5, ge=2, le=20, description="Cross-validation folds")
-    seed: int = Field(default=42, ge=1, description="Random seed")
-    stopping_metric: str = Field(default="AUTO", description="Stopping metric")
-    stopping_tolerance: float = Field(default=0.001, gt=0.0, description="Stopping tolerance")
-    stopping_rounds: int = Field(default=3, ge=1, description="Stopping rounds")
-    sort_metric: str = Field(default="AUTO", description="Leaderboard sort metric")
-    balance_classes: bool = Field(default=False, description="Balance class distribution")
-    exclude_algos: List[str] = Field(default=["DeepLearning"], description="Algorithms to exclude")
-    
-    # MLflow integration
-    enable_mlflow: bool = Field(default=False, description="Enable MLflow tracking")
-    mlflow_tracking_uri: Optional[str] = Field(default=None)
-    mlflow_experiment_name: str = Field(default="H2O AutoML")
-    mlflow_run_name: Optional[str] = Field(default=None)
-
-class AnalysisConfig(BaseModel):
-    """Complete analysis configuration"""
-    user_request: UserRequest
-    data_cleaning: DataCleaningParams = Field(default_factory=DataCleaningParams)
-    feature_engineering: FeatureEngineeringParams = Field(default_factory=FeatureEngineeringParams)
-    ml_params: MLParams = Field(default_factory=MLParams)
+    # ML Modeling Preferences
+    enable_mlflow: Optional[bool] = Field(default=True, description="Enable MLflow experiment tracking")
+    model_types: Optional[List[str]] = Field(default=["GBM", "RF", "GLM"], description="H2O model types to try")
 ```
 
-### Comprehensive Output Schema
+#### **1.2 Intent Parsing Schema**
 ```python
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
-
-class DataInfo(BaseModel):
-    """Dataset information and statistics"""
-    shape: tuple[int, int] = Field(description="Dataset dimensions (rows, columns)")
-    columns: List[str] = Field(description="Column names")
-    dtypes: Dict[str, str] = Field(description="Data types by column")
-    missing_values: Dict[str, int] = Field(description="Missing values by column")
-    memory_usage: str = Field(description="Memory usage")
-    sample_data: Dict[str, Any] = Field(description="Sample rows")
-
-class CleaningResults(BaseModel):
-    """Data cleaning results and statistics"""
-    original_shape: tuple[int, int]
-    cleaned_shape: tuple[int, int]
-    data_loss_percentage: float = Field(ge=0.0, le=100.0)
-    columns_removed: List[str] = Field(default_factory=list)
-    rows_removed: int = Field(ge=0)
-    missing_values_before: int
-    missing_values_after: int
-    duplicates_removed: int = Field(ge=0)
-    outliers_removed: int = Field(ge=0)
-    data_types_converted: Dict[str, str] = Field(default_factory=dict)
-    cleaning_function_path: Optional[str] = None
-    execution_time: float = Field(ge=0.0, description="Cleaning time in seconds")
-
-class FeatureResults(BaseModel):
-    """Feature engineering results"""
-    original_features: int
-    engineered_features: int
-    features_added: List[str] = Field(default_factory=list)
-    features_removed: List[str] = Field(default_factory=list)
-    encoding_applied: Dict[str, str] = Field(default_factory=dict)
-    scaling_applied: bool = False
-    polynomial_features_created: bool = False
-    datetime_features_created: List[str] = Field(default_factory=list)
-    feature_function_path: Optional[str] = None
-    execution_time: float = Field(ge=0.0)
-
-class ModelMetrics(BaseModel):
-    """Model performance metrics"""
-    model_id: str
-    metric_name: str
-    metric_value: float
+class WorkflowIntent(BaseModel):
+    """LLM-parsed workflow requirements"""
+    needs_data_cleaning: bool = Field(description="Requires data cleaning/preprocessing")
+    needs_feature_engineering: bool = Field(description="Requires feature engineering")
+    needs_ml_modeling: bool = Field(description="Requires ML model training")
     
-class MLResults(BaseModel):
-    """Machine learning results from H2O"""
-    leaderboard: List[Dict[str, Any]] = Field(description="H2O AutoML leaderboard")
-    best_model_id: str = Field(description="ID of best performing model")
-    best_model_metrics: Dict[str, float] = Field(description="Best model metrics")
-    model_path: Optional[str] = Field(description="Saved model path")
-    training_time: float = Field(ge=0.0, description="Training time in seconds")
-    cross_validation_metrics: Dict[str, float] = Field(default_factory=dict)
-    feature_importance: List[Dict[str, Union[str, float]]] = Field(default_factory=list)
-    model_explanation: str = Field(description="Model interpretation")
-    ml_function_path: Optional[str] = None
-    mlflow_run_id: Optional[str] = None
+    # Intelligent Analysis
+    data_quality_focus: bool = Field(description="Primary focus on data quality issues")
+    exploratory_analysis: bool = Field(description="Needs exploratory data analysis")
+    prediction_focus: bool = Field(description="Primary goal is prediction/modeling")
+    
+    # Extracted Information
+    suggested_target_variable: Optional[str] = Field(description="AI-suggested target variable")
+    suggested_problem_type: Optional[str] = Field(description="AI-suggested problem type")
+    key_requirements: List[str] = Field(description="Key requirements extracted from request")
+```
 
-class WorkflowStep(BaseModel):
-    """Individual workflow step result"""
-    step_name: str
-    status: str = Field(description="success/failed/skipped")
-    execution_time: float = Field(ge=0.0)
-    error_message: Optional[str] = None
-    output_summary: str
-
-class AnalysisReport(BaseModel):
-    """Comprehensive structured analysis report"""
-    model_config = ConfigDict(
-        validate_assignment=True,
-        json_encoders={datetime: lambda v: v.isoformat()}
-    )
+#### **1.3 Comprehensive Output Schema**
+```python
+class DataAnalysisResult(BaseModel):
+    """Complete structured output from data analysis workflow"""
     
     # Metadata
-    analysis_id: str = Field(description="Unique analysis identifier")
-    timestamp: datetime = Field(default_factory=datetime.now)
-    total_execution_time: float = Field(ge=0.0, description="Total analysis time in seconds")
+    request_id: str = Field(description="Unique request identifier")
+    timestamp: str = Field(description="Processing timestamp")
+    total_runtime_seconds: float = Field(description="Total processing time")
     
-    # Input summary
-    request_summary: str = Field(description="Summary of user request")
-    dataset_url: str = Field(description="Source dataset URL")
-    target_variable: Optional[str] = None
-    problem_type: str = Field(description="Detected or specified problem type")
+    # Input Summary
+    original_request: str = Field(description="Original user request")
+    csv_url: str = Field(description="Source CSV URL")
+    data_shape: Dict[str, int] = Field(description="Original data dimensions")
     
-    # Results
-    data_info: DataInfo
-    cleaning_results: CleaningResults
-    feature_engineering_results: FeatureResults
-    ml_results: MLResults
+    # Workflow Execution
+    workflow_intent: WorkflowIntent = Field(description="Parsed workflow requirements")
+    agents_executed: List[str] = Field(description="List of agents that were executed")
     
-    # Workflow information
-    workflow_steps: List[WorkflowStep] = Field(description="Detailed workflow execution")
+    # Agent Results
+    data_cleaning_results: Optional[Dict[str, Any]] = Field(description="Data cleaning outcomes")
+    feature_engineering_results: Optional[Dict[str, Any]] = Field(description="Feature engineering outcomes")
+    ml_modeling_results: Optional[Dict[str, Any]] = Field(description="ML modeling outcomes")
     
-    # Analysis outputs
-    executive_summary: str = Field(description="High-level analysis summary")
-    key_insights: List[str] = Field(description="Important findings from the analysis")
-    recommendations: List[str] = Field(description="Actionable recommendations")
-    limitations: List[str] = Field(description="Analysis limitations and caveats")
+    # File Outputs
+    generated_files: Dict[str, str] = Field(description="Generated file paths by type")
     
-    # File outputs
-    generated_files: Dict[str, str] = Field(
-        description="Generated files (type -> path mapping)",
-        default_factory=dict
-    )
-    visualizations: List[Dict[str, str]] = Field(
-        description="Generated visualizations with descriptions",
-        default_factory=list
-    )
-    
-    # Quality metrics
-    data_quality_score: float = Field(ge=0.0, le=100.0, description="Overall data quality score")
-    model_confidence: float = Field(ge=0.0, le=100.0, description="Model reliability score")
-    analysis_reliability: str = Field(description="HIGH/MEDIUM/LOW reliability assessment")
+    # Analysis Summary
+    key_insights: List[str] = Field(description="Key insights from the analysis")
+    recommendations: List[str] = Field(description="Recommendations for next steps")
+    quality_score: float = Field(description="Overall analysis quality score (0-1)")
 ```
 
-## Success Criteria
-1. **Robust Input Handling**: Handle various input formats and provide helpful error messages
-2. **Accurate Parameter Extraction**: 95%+ accuracy in extracting user intent and parameters
-3. **Comprehensive Outputs**: Structured reports that showcase all agent capabilities
-4. **Better Performance**: Faster processing through optimized workflows
-5. **Maintainable Code**: Well-documented, modular, and testable implementation
+### **Step 2: LLM-Powered Intent Parser**
+**Files**: `src/parsers/intent_parser.py`
 
-## Implementation Timeline
-- **Step 1-2**: Schema and parser development (Foundation)
-- **Step 3-4**: Core agent and parameter mapping (Core functionality)  
-- **Step 5-6**: Report generation and testing (Quality assurance)
-- **Step 7**: Integration and documentation (Completion)
+#### **2.1 Structured Intent Parsing**
+```python
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
 
-## Technical Considerations
-- Use Pydantic v2 for schema validation
-- Leverage LangChain's `with_structured_output()` method
-- Implement proper error handling and recovery
-- Ensure backward compatibility where possible
-- Add comprehensive logging and debugging capabilities
+class AdvancedIntentParser:
+    def __init__(self, model: ChatOpenAI):
+        self.model = model
+        self.structured_model = model.with_structured_output(WorkflowIntent)
+        
+    def parse_user_intent(self, user_request: str, data_preview: str) -> WorkflowIntent:
+        """Parse user intent using LLM with structured output"""
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are an expert data scientist analyzing user requests for data analysis workflows.
+            
+            Based on the user's request and data preview, determine what types of analysis are needed.
+            Consider the complexity and nuance of the request - don't just look for keywords.
+            
+            Key considerations:
+            - Data quality issues require cleaning
+            - Feature creation/transformation needs feature engineering  
+            - Prediction/modeling goals need ML modeling
+            - Complex requests may need multiple steps
+            
+            Provide intelligent suggestions for target variables and problem types based on context."""),
+            ("human", """
+            User Request: {user_request}
+            
+            Data Preview (first few rows and columns):
+            {data_preview}
+            
+            Analyze this request and determine the required workflow steps.
+            """)
+        ])
+        
+        return self.structured_model.invoke(
+            prompt.format_messages(
+                user_request=user_request,
+                data_preview=data_preview
+            )
+        )
+```
 
-This implementation will create a significantly more robust and capable data analysis agent that leverages the full potential of the underlying specialized agents while providing a much better user experience through structured inputs and outputs. 
+### **Step 3: Comprehensive Parameter Mapping**
+**Files**: `src/mappers/parameter_mapper.py`
+
+#### **3.1 Agent Parameter Intelligence**
+```python
+class AgentParameterMapper:
+    """Map user preferences to specific agent parameters"""
+    
+    def map_data_cleaning_params(self, request: DataAnalysisRequest, intent: WorkflowIntent) -> Dict[str, Any]:
+        """Map to all 11 DataCleaningAgent parameters"""
+        return {
+            'model': self.model,
+            'n_samples': min(50, request.max_runtime_seconds // 10),  # Adaptive sampling
+            'log': True,
+            'log_path': f"logs/cleaning_{request.request_id}/",
+            'file_name': f"cleaned_data_{request.request_id}",
+            'function_name': "clean_data",
+            'overwrite': True,
+            'human_in_the_loop': False,  # Automated workflow
+            'bypass_recommended_steps': not intent.data_quality_focus,
+            'bypass_explain_code': False,
+            'checkpointer': None,  # Could add checkpointing later
+            
+            # Advanced parameters based on user preferences
+            'missing_threshold': request.missing_threshold,
+            'outlier_detection': request.outlier_detection,
+        }
+    
+    def map_feature_engineering_params(self, request: DataAnalysisRequest, intent: WorkflowIntent) -> Dict[str, Any]:
+        """Map to all FeatureEngineeringAgent parameters"""
+        return {
+            'model': self.model,
+            'n_samples': min(50, request.max_runtime_seconds // 10),
+            'log': True,
+            'log_path': f"logs/features_{request.request_id}/",
+            'file_name': f"engineered_data_{request.request_id}",
+            'function_name': "engineer_features",
+            'overwrite': True,
+            'human_in_the_loop': False,
+            'bypass_recommended_steps': not intent.exploratory_analysis,
+            'bypass_explain_code': False,
+            'checkpointer': None,
+            
+            # Feature engineering specific
+            'target_variable': request.target_variable or intent.suggested_target_variable,
+            'feature_selection': request.feature_selection,
+            'datetime_features': request.datetime_features,
+        }
+    
+    def map_h2o_ml_params(self, request: DataAnalysisRequest, intent: WorkflowIntent) -> Dict[str, Any]:
+        """Map to all 15+ H2OMLAgent parameters"""
+        return {
+            'model': self.model,
+            'n_samples': min(100, request.max_runtime_seconds // 5),
+            'log': True,
+            'log_path': f"logs/ml_{request.request_id}/",
+            'file_name': f"ml_model_{request.request_id}",
+            'function_name': "train_h2o_model",
+            'overwrite': True,
+            'human_in_the_loop': False,
+            'bypass_recommended_steps': not intent.prediction_focus,
+            'bypass_explain_code': False,
+            'checkpointer': None,
+            
+            # H2O ML specific parameters
+            'model_directory': f"models/{request.request_id}/",
+            'enable_mlflow': request.enable_mlflow,
+            'mlflow_tracking_uri': "http://localhost:5000",  # Default MLflow URI
+            'mlflow_experiment_name': f"data_analysis_{request.request_id}",
+            'target_variable': request.target_variable or intent.suggested_target_variable,
+            'problem_type': request.problem_type,
+            'max_runtime_secs': request.max_runtime_seconds,
+            'model_types': request.model_types,
+        }
+```
+
+### **Step 4: Enhanced Data Analysis Agent**
+**Files**: `src/agents/data_analysis_agent.py`
+
+#### **4.1 Core Agent Implementation**
+```python
+class DataAnalysisAgent:
+    """Enhanced data analysis agent with structured outputs"""
+    
+    def __init__(self, model: ChatOpenAI = None, output_dir: str = "output/analysis/"):
+        self.model = model or ChatOpenAI(model="gpt-4o-mini")
+        self.output_dir = output_dir
+        self.intent_parser = AdvancedIntentParser(self.model)
+        self.parameter_mapper = AgentParameterMapper(self.model)
+        
+        # Initialize structured output model
+        self.structured_model = self.model.with_structured_output(DataAnalysisResult)
+        
+        os.makedirs(self.output_dir, exist_ok=True)
+    
+    async def analyze_data(self, request: DataAnalysisRequest) -> DataAnalysisResult:
+        """Main analysis method with structured outputs"""
+        start_time = time.time()
+        request_id = str(uuid.uuid4())[:8]
+        
+        try:
+            # Step 1: Download and preview data
+            df, temp_path = await self._download_and_preview_data(request.csv_url)
+            data_preview = self._generate_data_preview(df)
+            
+            # Step 2: Parse intent with LLM
+            intent = self.intent_parser.parse_user_intent(request.user_request, data_preview)
+            
+            # Step 3: Execute workflow based on intent
+            results = await self._execute_workflow(request, intent, df, request_id)
+            
+            # Step 4: Generate structured output
+            return self._generate_structured_result(
+                request, intent, results, request_id, 
+                time.time() - start_time, df.shape
+            )
+            
+        except Exception as e:
+            return self._generate_error_result(request, str(e), request_id)
+```
+
+### **Step 5: Intelligent Workflow Orchestration**
+**Files**: `src/orchestrators/workflow_orchestrator.py`
+
+#### **5.1 Smart Agent Sequencing**
+```python
+class WorkflowOrchestrator:
+    """Intelligent workflow orchestration based on intent"""
+    
+    async def execute_workflow(self, request: DataAnalysisRequest, intent: WorkflowIntent, 
+                              df: pd.DataFrame, request_id: str) -> Dict[str, Any]:
+        """Execute agents in intelligent sequence"""
+        
+        results = {
+            'agents_executed': [],
+            'data_cleaning_results': None,
+            'feature_engineering_results': None,
+            'ml_modeling_results': None,
+            'generated_files': {},
+            'errors': []
+        }
+        
+        current_df = df.copy()
+        
+        # Phase 1: Data Cleaning (if needed)
+        if intent.needs_data_cleaning:
+            try:
+                cleaning_params = self.parameter_mapper.map_data_cleaning_params(request, intent)
+                current_df, cleaning_results = await self._execute_data_cleaning(
+                    current_df, request.user_request, cleaning_params, request_id
+                )
+                results['data_cleaning_results'] = cleaning_results
+                results['agents_executed'].append('data_cleaning')
+            except Exception as e:
+                results['errors'].append(f"Data cleaning failed: {str(e)}")
+        
+        # Phase 2: Feature Engineering (if needed)
+        if intent.needs_feature_engineering:
+            try:
+                feature_params = self.parameter_mapper.map_feature_engineering_params(request, intent)
+                current_df, feature_results = await self._execute_feature_engineering(
+                    current_df, request.user_request, feature_params, request_id
+                )
+                results['feature_engineering_results'] = feature_results
+                results['agents_executed'].append('feature_engineering')
+            except Exception as e:
+                results['errors'].append(f"Feature engineering failed: {str(e)}")
+        
+        # Phase 3: ML Modeling (if needed)
+        if intent.needs_ml_modeling:
+            target_var = request.target_variable or intent.suggested_target_variable
+            if target_var and target_var in current_df.columns:
+                try:
+                    ml_params = self.parameter_mapper.map_h2o_ml_params(request, intent)
+                    ml_results = await self._execute_ml_modeling(
+                        current_df, request.user_request, ml_params, request_id
+                    )
+                    results['ml_modeling_results'] = ml_results
+                    results['agents_executed'].append('h2o_ml')
+                except Exception as e:
+                    results['errors'].append(f"ML modeling failed: {str(e)}")
+            else:
+                results['errors'].append(f"ML modeling requested but target variable '{target_var}' not found")
+        
+        return results
+```
+
+### **Step 6: Advanced Output Processing**
+**Files**: `src/processors/output_processor.py`
+
+#### **6.1 Rich Result Generation**
+```python
+class OutputProcessor:
+    """Process and enrich analysis results"""
+    
+    def generate_structured_result(self, request: DataAnalysisRequest, intent: WorkflowIntent,
+                                  workflow_results: Dict, request_id: str, 
+                                  runtime: float, data_shape: tuple) -> DataAnalysisResult:
+        """Generate comprehensive structured output"""
+        
+        # Extract key insights using LLM
+        insights = self._extract_key_insights(workflow_results, request.user_request)
+        recommendations = self._generate_recommendations(workflow_results, intent)
+        quality_score = self._calculate_quality_score(workflow_results)
+        
+        return DataAnalysisResult(
+            request_id=request_id,
+            timestamp=datetime.now().isoformat(),
+            total_runtime_seconds=runtime,
+            
+            original_request=request.user_request,
+            csv_url=request.csv_url,
+            data_shape={"rows": data_shape[0], "columns": data_shape[1]},
+            
+            workflow_intent=intent,
+            agents_executed=workflow_results['agents_executed'],
+            
+            data_cleaning_results=workflow_results.get('data_cleaning_results'),
+            feature_engineering_results=workflow_results.get('feature_engineering_results'),
+            ml_modeling_results=workflow_results.get('ml_modeling_results'),
+            
+            generated_files=workflow_results.get('generated_files', {}),
+            
+            key_insights=insights,
+            recommendations=recommendations,
+            quality_score=quality_score
+        )
+```
+
+### **Step 7: Testing & Validation**
+**Files**: `tests/test_data_analysis_agent.py`
+
+#### **7.1 Comprehensive Test Suite**
+```python
+import pytest
+from src.agents.data_analysis_agent import DataAnalysisAgent
+from src.schemas.data_analysis_schemas import DataAnalysisRequest
+
+class TestDataAnalysisAgent:
+    """Comprehensive test suite for enhanced data analysis agent"""
+    
+    @pytest.fixture
+    def agent(self):
+        return DataAnalysisAgent()
+    
+    @pytest.mark.asyncio
+    async def test_simple_cleaning_request(self, agent):
+        """Test basic data cleaning workflow"""
+        request = DataAnalysisRequest(
+            csv_url="https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv",
+            user_request="Clean this dataset and handle missing values"
+        )
+        
+        result = await agent.analyze_data(request)
+        
+        assert result.workflow_intent.needs_data_cleaning == True
+        assert result.workflow_intent.needs_ml_modeling == False
+        assert 'data_cleaning' in result.agents_executed
+        assert result.quality_score > 0.5
+    
+    @pytest.mark.asyncio
+    async def test_full_ml_pipeline(self, agent):
+        """Test complete ML workflow"""
+        request = DataAnalysisRequest(
+            csv_url="https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv",
+            user_request="Build a machine learning model to predict passenger survival",
+            target_variable="Survived"
+        )
+        
+        result = await agent.analyze_data(request)
+        
+        assert result.workflow_intent.needs_data_cleaning == True
+        assert result.workflow_intent.needs_feature_engineering == True
+        assert result.workflow_intent.needs_ml_modeling == True
+        assert len(result.agents_executed) == 3
+        assert result.ml_modeling_results is not None
+```
+
+## 🎯 **SUCCESS CRITERIA & VALIDATION**
+
+### **Functional Requirements:**
+- ✅ **Intent Parsing**: 95%+ accuracy on complex data analysis requests
+- ✅ **Parameter Utilization**: Use all available agent parameters intelligently  
+- ✅ **Structured Outputs**: Complete Pydantic validation with rich results
+- ✅ **Error Handling**: Graceful failure with detailed error reporting
+- ✅ **Performance**: Process typical datasets in <5 minutes
+
+### **Technical Requirements:**
+- ✅ **Schema Validation**: All inputs/outputs validated with Pydantic
+- ✅ **LangChain Integration**: Use latest `with_structured_output()` methods
+- ✅ **Agent Compatibility**: Work with existing agent implementations
+- ✅ **Extensibility**: Easy to add new agents or parameters
+
+## 📋 **IMPLEMENTATION CHECKLIST**
+
+- [ ] **Step 1**: Schema design and validation infrastructure
+- [ ] **Step 2**: LLM-powered intent parser with structured outputs
+- [ ] **Step 3**: Comprehensive parameter mapping for all agents
+- [ ] **Step 4**: Enhanced data analysis agent core implementation
+- [ ] **Step 5**: Intelligent workflow orchestration
+- [ ] **Step 6**: Advanced output processing with insights generation
+- [ ] **Step 7**: Comprehensive testing and validation
+
+---
+
+**🚀 This plan addresses every limitation of the current supervisor agent and creates a production-ready, intelligent data analysis system using the latest LangChain structured outputs capabilities.** 
