@@ -67,6 +67,7 @@ demo/h2o_models/
 *.json
 agent*_data.json
 temp_data_*.csv
+mlruns/
 
 # Supplementary folders & files
 ai-data-science-team/explanation/
