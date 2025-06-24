@@ -600,9 +600,17 @@ class DataAnalysisAgent:
     def _get_data_shape(self, csv_url: str) -> Dict[str, int]:
         """Get the shape of the dataset."""
         try:
-            df = pd.read_csv(csv_url, nrows=1)
-            return {"rows": "unknown", "columns": len(df.columns)}
-        except:
+            # First get column count with minimal read
+            df_sample = pd.read_csv(csv_url, nrows=1)
+            columns = len(df_sample.columns)
+            
+            # Then get full row count efficiently
+            df_full = pd.read_csv(csv_url)
+            rows = len(df_full)
+            
+            return {"rows": rows, "columns": columns}
+        except Exception as e:
+            logger.warning(f"Could not determine data shape for {csv_url}: {e}")
             return {"rows": "unknown", "columns": "unknown"}
     
     # Placeholder methods for metrics extraction and analysis

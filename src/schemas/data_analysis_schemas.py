@@ -55,9 +55,9 @@ class DataAnalysisRequest(BaseModel):
     )
     max_runtime_seconds: Optional[int] = Field(
         default=300,
-        ge=60,
+        ge=30,  # Reduced from 60 to 30 for performance optimization
         le=1800,
-        description="Maximum runtime per agent (60-1800 seconds)"
+        description="Maximum runtime per agent (30-1800 seconds, optimized for dataset size)"
     )
     
     # Data Cleaning Preferences
