@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from src.schemas import WorkflowIntent, ProblemType
+from src.schemas import WorkflowIntent, ProblemType, DatasetExtractionRequest
 
 logger = logging.getLogger(__name__)
 
@@ -301,6 +301,61 @@ Based on this information, analyze the user's request and provide a structured w
         
         # Parse intent with the data information
         return self.parse_intent(user_request, csv_url, data_info)
+
+    def extract_dataset_url_from_text(self, text_input: str) -> DatasetExtractionRequest:
+        """
+        Extract dataset URL from text using LLM with structured outputs.
+        
+        Args:
+            text_input: User's text input that may contain dataset information
+            
+        Returns:
+            DatasetExtractionRequest with extracted URL and metadata
+        """
+        try:
+            # Create extraction parser
+            extraction_parser = PydanticOutputParser(pydantic_object=DatasetExtractionRequest)
+            
+            # Create extraction prompt
+            extraction_prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a dataset URL extraction expert. Your task is to analyze user text and extract CSV dataset URLs.
+
+EXTRACTION RULES:
+1. Look for explicit HTTP/HTTPS URLs that end with .csv
+2. Only extract URLs that clearly point to CSV files
+3. Do NOT invent or generate URLs that aren't explicitly mentioned
+4. If no URL is found, set extraction_method to "none_found" and provide an empty string for extracted_csv_url
+5. Be conservative - only extract URLs you are confident about
+
+IMPORTANT: Do not create or infer URLs from dataset names. Only extract explicit URLs that are mentioned in the text."""),
+                ("user", """TEXT TO ANALYZE: {text_input}
+
+Extract the CSV dataset URL from this text. If no explicit CSV URL is found, indicate that none was found.
+
+{format_instructions}""")
+            ])
+            
+            # Create extraction chain
+            extraction_chain = extraction_prompt | self.llm | extraction_parser
+            
+            # Extract URL
+            result = extraction_chain.invoke({
+                "text_input": text_input,
+                "format_instructions": extraction_parser.get_format_instructions()
+            })
+            
+            logger.info(f"URL extraction result: {result.extraction_method} with confidence {result.extraction_confidence}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to extract dataset URL: {e}")
+            # Return fallback result
+            return DatasetExtractionRequest(
+                extracted_csv_url="",
+                extraction_confidence=0.0,
+                extraction_method="none_found",
+                extraction_notes=f"Extraction failed: {str(e)}"
+            )
 
 
 # Convenience function for quick usage

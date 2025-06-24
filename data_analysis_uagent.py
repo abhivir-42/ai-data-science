@@ -2,12 +2,11 @@
 """
 Data Analysis uAgent Implementation
 
-Following the Fetch.ai LangGraph adapter example pattern.
-This wraps the DataAnalysisAgent as a uAgent for deployment on ASI:One.
+Following EXACTLY the Fetch.ai LangGraph adapter example:
+https://innovationlab.fetch.ai/resources/docs/examples/adapters/langgraph-adapter-example
 
-Unlike the supervisor_uagent.py, this leverages the full structured output
-capabilities of the enhanced DataAnalysisAgent with proper schema validation
-and intelligent parameter mapping.
+This wraps the DataAnalysisAgent as a uAgent for deployment on ASI:One.
+The wrapper is minimal and leverages the full intelligence of DataAnalysisAgent.
 """
 
 import os
@@ -24,7 +23,7 @@ from src.agents.data_analysis_agent import DataAnalysisAgent
 # Load environment variables
 load_dotenv()
 
-# Set API keys
+# Set API keys (exactly like the example)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 API_TOKEN = os.environ.get("AGENTVERSE_API_TOKEN")
 
@@ -41,153 +40,46 @@ data_analysis_agent = DataAnalysisAgent(
     enable_async=False  # Use synchronous mode for uAgent compatibility
 )
 
-# Dataset URL mappings for convenience (optional fallback)
-DATASET_URLS = {
-    'iris': 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv',
-    'titanic': 'https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv',
-    'wine': 'https://raw.githubusercontent.com/plotly/datasets/master/wine_data.csv',
-    'boston': 'https://raw.githubusercontent.com/selva86/datasets/master/BostonHousing.csv',
-    'diabetes': 'https://raw.githubusercontent.com/plotly/datasets/master/diabetes.csv',
-    'tips': 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/tips.csv',
-    'flights': 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/flights.csv'
-}
-
-def detect_dataset_url(query_text):
-    """Simple dataset detection for convenience - fallback only."""
-    query_lower = query_text.lower()
-    
-    for dataset_name, url in DATASET_URLS.items():
-        if dataset_name in query_lower:
-            return url
-    
-    return None
-
 def data_analysis_agent_func(query):
     """
-    Enhanced data analysis agent function that leverages the full DataAnalysisAgent capabilities.
+    Enhanced data analysis agent function following the LangGraph adapter pattern.
     
     This wrapper:
-    - Handles input format conversion
-    - Leverages DataAnalysisAgent's structured input/output 
-    - Uses intelligent intent parsing and parameter mapping
-    - Returns comprehensive structured analysis results
-    - Supports both simple text and structured dict inputs
+    - Handles input format conversion (exactly like LangGraph example)
+    - Directly invokes DataAnalysisAgent.analyze_from_text()
+    - Returns formatted results
+    - Leverages all DataAnalysisAgent intelligence without duplication
+    
+    The DataAnalysisAgent intelligently:
+    - Extracts CSV URLs from text using LLM structured outputs
+    - Parses workflow intent to determine which agents to run
+    - Executes only the needed agents (cleaning, feature engineering, ML)
+    - Returns comprehensive structured results
     """
-    # Handle input if it's a dict with 'input' key (standard uAgent pattern)
+    # Handle input if it's a dict with 'input' key (EXACT pattern from example)
     if isinstance(query, dict) and 'input' in query:
         query = query['input']
     
     try:
-        csv_url = None
-        user_request = None
-        additional_params = {}
+        # Direct invocation of the underlying DataAnalysisAgent
+        # This uses LLM structured outputs to extract CSV URLs and parse intent
+        result = data_analysis_agent.analyze_from_text(query)
         
-        # Parse the query to extract parameters
-        if isinstance(query, str):
-            user_request = query
-            
-            # Try to detect dataset from query if no URL provided
-            detected_url = detect_dataset_url(query)
-            if detected_url:
-                csv_url = detected_url
-                print(f"🔍 Auto-detected dataset URL: {csv_url}")
-            
-        elif isinstance(query, dict):
-            # Extract parameters from structured input
-            user_request = query.get('user_request', query.get('query', ''))
-            csv_url = query.get('csv_url')
-            
-            # Extract additional DataAnalysisRequest parameters
-            additional_params = {
-                'target_variable': query.get('target_variable'),
-                'problem_type': query.get('problem_type'),
-                'max_runtime_minutes': query.get('max_runtime_minutes', 30),
-                'enable_advanced_features': query.get('enable_advanced_features', True),
-                'quality_threshold': query.get('quality_threshold', 0.8),
-                'performance_vs_speed': query.get('performance_vs_speed', 'balanced')
-            }
-            
-            # Remove None values
-            additional_params = {k: v for k, v in additional_params.items() if v is not None}
-            
-            # If no CSV URL provided, try to detect from request
-            if not csv_url and user_request:
-                detected_url = detect_dataset_url(user_request)
-                if detected_url:
-                    csv_url = detected_url
-                    print(f"🔍 Auto-detected dataset URL: {csv_url}")
-                    
-        else:
-            return """
-🚫 **Input Format Error**
-
-I need either:
-1. A simple text request like: "Analyze the iris dataset for classification"
-2. A structured request like: {
-     "csv_url": "your-url", 
-     "user_request": "your-task",
-     "target_variable": "optional",
-     "problem_type": "classification|regression"
-   }
-
-**Supported datasets**: iris, titanic, wine, boston, diabetes, tips, flights
-"""
-        
-        # Validate required parameters
-        if not user_request:
-            return """
-🚫 **Missing Request**
-
-Please tell me what you'd like me to do! For example:
-- "Analyze the iris dataset for species classification"
-- "Clean and engineer features for the titanic dataset"
-- "Build a regression model to predict wine quality"
-- "Perform complete ML pipeline on the flights dataset"
-"""
-        
-        if not csv_url:
-            return """
-🚫 **Dataset Required**
-
-Please provide either:
-- A known dataset name (iris, titanic, wine, boston, diabetes, tips, flights)
-- A direct CSV URL in the request
-- A structured input with 'csv_url' field
-
-Example: "Analyze the iris dataset for classification"
-Or: {"csv_url": "https://your-url.com/data.csv", "user_request": "classify the data"}
-"""
-        
-        # Process the request using the enhanced DataAnalysisAgent
-        print(f"🚀 Processing enhanced data analysis request:")
-        print(f"   📊 Dataset URL: {csv_url}")
-        print(f"   📝 Request: {user_request}")
-        if additional_params:
-            print(f"   ⚙️  Additional params: {additional_params}")
-        
-        # Call the DataAnalysisAgent with structured parameters
-        result = data_analysis_agent.analyze(
-            csv_url=csv_url,
-            user_request=user_request,
-            **additional_params
-        )
-        
-        # Format the structured result for display
+        # Format the structured result for uAgent compatibility
         return format_analysis_result(result)
         
     except Exception as e:
         error_msg = f"""
 🚫 **Analysis Error**
 
-Sorry, I encountered an issue during analysis: {str(e)}
+Sorry, I encountered an issue: {str(e)}
 
 **Common solutions:**
-1. Check if the dataset URL is accessible
-2. Ensure your request is clear and specific
-3. Try specifying the target variable explicitly for ML tasks
-4. Check that the dataset format is valid CSV
+1. Include a direct CSV URL in your request (e.g., https://example.com/data.csv)
+2. Be specific about what analysis you want
+3. Example: "Clean and analyze https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv for survival prediction"
 
-**Need help?** Try: "Analyze the iris dataset for species classification"
+**Need help?** Try: "Analyze https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv for species classification"
 """
         print(f"❌ Error in data analysis agent: {str(e)}")
         return error_msg
@@ -240,13 +132,13 @@ def format_analysis_result(result) -> str:
                 metrics_added = True
             lines.append(f"   • Data Quality: {result.overall_data_quality_score:.2f}/1.0")
         
-        if result.feature_engineering_effectiveness is not None:
+        if hasattr(result, 'feature_engineering_effectiveness') and result.feature_engineering_effectiveness is not None:
             if not metrics_added:
                 lines.extend(["📈 **PERFORMANCE METRICS**:", ""])
                 metrics_added = True
             lines.append(f"   • Feature Engineering: {result.feature_engineering_effectiveness:.2f}/1.0")
         
-        if result.model_performance_score is not None:
+        if hasattr(result, 'model_performance_score') and result.model_performance_score is not None:
             if not metrics_added:
                 lines.extend(["📈 **PERFORMANCE METRICS**:", ""])
                 metrics_added = True
@@ -313,17 +205,17 @@ def format_analysis_result(result) -> str:
     except Exception as e:
         return f"❌ Error formatting result: {str(e)}\n\nRaw result: {str(result)}"
 
-# Register the enhanced data analysis agent via uAgent
+# Register the DataAnalysisAgent via uAgent (EXACT pattern from LangGraph example)
 tool = LangchainRegisterTool()
 
 print("🚀 Registering enhanced data analysis uAgent...")
 
 agent_info = tool.invoke(
     {
-        "agent_obj": data_analysis_agent_func,
+        "agent_obj": data_analysis_agent_func,  # Pass the function
         "name": "enhanced_data_analysis",
         "port": 8102,
-        "description": "Enhanced data analysis agent with structured outputs, intelligent intent parsing, and comprehensive ML pipeline orchestration from remote CSV files",
+        "description": "Enhanced data analysis agent with LLM-powered CSV URL extraction, intelligent workflow orchestration, and comprehensive ML pipeline automation",
         "api_token": API_TOKEN,
         "mailbox": True
     }
@@ -337,13 +229,14 @@ if isinstance(agent_info, dict):
     agent_address = agent_info.get('agent_address', 'Unknown')
     agent_port = agent_info.get('agent_port', '8102')
 elif isinstance(agent_info, str):
+    # If it's a string, extract from logs
     agent_address = "Check logs above for actual address"
     agent_port = "8102"
 else:
     agent_address = "Unknown"
     agent_port = "8102"
 
-# Keep the agent alive
+# Keep the agent alive (EXACT pattern from example)
 if __name__ == "__main__":
     try:
         print("\n🎉 ENHANCED DATA ANALYSIS UAGENT IS RUNNING!")
@@ -352,16 +245,15 @@ if __name__ == "__main__":
         print(f"🌐 Port: {agent_port}")
         print(f"🎯 Inspector: https://agentverse.ai/inspect/?uri=http%3A//127.0.0.1%3A{agent_port}&address={agent_address}")
         print("\n📋 Usage:")
-        print("Send a message with:")
-        print('• Simple string: "Analyze the iris dataset for classification"')
-        print('• Structured dict: {')
-        print('    "csv_url": "https://your-url.com/data.csv",')
-        print('    "user_request": "Build a classification model",')
-        print('    "target_variable": "species",')
-        print('    "problem_type": "classification"')
-        print('  }')
-        print("\n🔗 Supported datasets: iris, titanic, wine, boston, diabetes, tips, flights")
-        print("🎯 Enhanced features: Structured outputs, intelligent parsing, comprehensive reports")
+        print("Send a message with a CSV URL and analysis request:")
+        print('- "Clean and analyze https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv for survival prediction"')
+        print('- "Perform feature engineering on https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv"')
+        print('- "Build ML model using https://example.com/your-data.csv to predict target_column"')
+        print("\n🎯 The agent uses AI to:")
+        print("• Extract CSV URLs from your text using LLM structured outputs")
+        print("• Parse your intent to determine which analysis steps to run")
+        print("• Execute only the needed agents (cleaning, feature engineering, ML)")
+        print("• Return comprehensive structured results")
         print("\nPress Ctrl+C to stop...")
         
         while True:

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/c29dca108285408b96a9a0ac99347cf3/artifacts
+end_time: 1750725699541
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: c29dca108285408b96a9a0ac99347cf3
+run_name: big-fly-237
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750725510044
+status: 3
+tags: []
+user_id: abhivir42

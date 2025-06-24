@@ -14,7 +14,8 @@ from .data_analysis_schemas import (
     FeatureEngineeringMetrics,
     MLModelingMetrics,
     ProblemType,
-    ModelType
+    ModelType,
+    DatasetExtractionRequest
 )
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "FeatureEngineeringMetrics",
     "MLModelingMetrics",
     "ProblemType",
-    "ModelType"
+    "ModelType",
+    "DatasetExtractionRequest"
 ]

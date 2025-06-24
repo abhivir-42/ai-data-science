@@ -372,3 +372,23 @@ class DataAnalysisResult(BaseModel):
         use_enum_values = True
         validate_assignment = True
         extra = "forbid"  # Don't allow extra fields
+
+
+class DatasetExtractionRequest(BaseModel):
+    """Schema for extracting dataset information from text using LLM structured outputs"""
+    
+    extracted_csv_url: str = Field(
+        description="Extracted or detected CSV URL from the user's text input"
+    )
+    extraction_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for the URL extraction (0.0-1.0)"
+    )
+    extraction_method: Literal["direct_url", "inferred_from_context", "none_found"] = Field(
+        description="Method used to extract the URL"
+    )
+    extraction_notes: Optional[str] = Field(
+        default=None,
+        description="Notes about the extraction process or issues encountered"
+    )

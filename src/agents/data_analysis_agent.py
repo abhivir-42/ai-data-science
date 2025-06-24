@@ -730,4 +730,86 @@ class DataAnalysisAgent:
             confidence_level="low",
             warnings=[error_message],
             limitations=["Complete analysis failure"]
-        ) 
+        )
+    
+    def analyze_from_text(self, text_input: str) -> DataAnalysisResult:
+        """
+        Analyze data from a single text input containing dataset info and instructions.
+        
+        This method intelligently parses the text to extract:
+        - Dataset URLs using LLM structured outputs
+        - Analysis instructions and requirements
+        - Target variables and problem types
+        
+        Args:
+            text_input: Single text containing all information
+            
+        Returns:
+            DataAnalysisResult with comprehensive analysis
+        """
+        self.execution_start_time = time.time()
+        
+        try:
+            # Step 1: Extract CSV URL using LLM structured outputs
+            logger.info("Extracting dataset URL from text using LLM...")
+            url_extraction = self.intent_parser.extract_dataset_url_from_text(text_input)
+            
+            if (url_extraction.extraction_method == "none_found" or 
+                not url_extraction.extracted_csv_url or 
+                url_extraction.extraction_confidence < 0.3):
+                return self._create_error_result(
+                    "", 
+                    text_input, 
+                    "Could not detect a valid CSV URL in your request. Please include a direct link to a CSV file (e.g., https://example.com/data.csv)."
+                )
+            
+            csv_url = url_extraction.extracted_csv_url
+            logger.info(f"Extracted CSV URL: {csv_url} (confidence: {url_extraction.extraction_confidence})")
+            
+            # Step 2: Parse workflow intent with the detected CSV URL
+            logger.info("Parsing workflow intent...")
+            intent = self.intent_parser.parse_with_data_preview(text_input, csv_url)
+            
+            # Step 3: Create request with detected parameters
+            request = DataAnalysisRequest(
+                csv_url=csv_url,
+                user_request=text_input,
+                target_variable=intent.suggested_target_variable,
+                problem_type=intent.suggested_problem_type,  # Use the intent parser's suggestion
+                max_runtime_seconds=300,  # Default 5 minutes
+                enable_mlflow=True,
+                missing_threshold=0.4,
+                outlier_detection=True,
+                duplicate_removal=True,
+                feature_selection=True,
+                datetime_features=True,
+                categorical_encoding=True
+            )
+            
+            # Step 4: Execute the workflow based on intent flags
+            logger.info(f"Executing workflow - Cleaning: {intent.needs_data_cleaning}, FE: {intent.needs_feature_engineering}, ML: {intent.needs_ml_modeling}")
+            agent_results = self._execute_workflow_sync(request, intent)
+            
+            # Step 5: Generate comprehensive result
+            result = self._generate_result(request, intent, agent_results)
+            
+            # Add URL extraction information to warnings if confidence is low
+            if url_extraction.extraction_confidence < 0.7:
+                result.warnings.append(f"Low confidence in URL extraction ({url_extraction.extraction_confidence:.2f})")
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Text analysis failed: {e}")
+            return self._create_error_result("", text_input, str(e))
+    
+    # Remove the old problematic methods
+    def _extract_csv_url_from_text(self, text_input: str, intent: WorkflowIntent) -> Optional[str]:
+        """DEPRECATED: Use intent_parser.extract_dataset_url_from_text() instead"""
+        # This method is no longer used - URL extraction is now handled by LLM structured outputs
+        pass
+    
+    def _infer_problem_type(self, intent: WorkflowIntent) -> Optional[str]:
+        """DEPRECATED: Problem type is now suggested by the intent parser directly"""
+        # This method is no longer needed - the intent parser already suggests problem type
+        pass 

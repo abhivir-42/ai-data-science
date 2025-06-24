@@ -1,5 +1,5 @@
 artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/184ac715fb2947d68d5bfad0227b4e8a/artifacts
-end_time: null
+end_time: 1750725585414
 entry_point_name: ''
 experiment_id: '781176133340062294'
 lifecycle_stage: active
@@ -9,6 +9,6 @@ source_name: ''
 source_type: 4
 source_version: ''
 start_time: 1750724839823
-status: 1
+status: 3
 tags: []
 user_id: abhivir42
