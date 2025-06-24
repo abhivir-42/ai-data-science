@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/a68877a86a4a4fe987276c8025ed4118/artifacts
+end_time: 1750723484575
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: a68877a86a4a4fe987276c8025ed4118
+run_name: melodic-ram-720
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750723317293
+status: 4
+tags: []
+user_id: abhivir42

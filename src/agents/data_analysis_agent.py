@@ -315,6 +315,12 @@ class DataAnalysisAgent:
         start_time = time.time()
         
         try:
+            # Load data as DataFrame
+            if data_path.startswith(('http://', 'https://')):
+                data_df = pd.read_csv(data_path)
+            else:
+                data_df = pd.read_csv(data_path)
+            
             # Map parameters
             params = self.parameter_mapper.map_data_cleaning_parameters(
                 request, intent, data_path
@@ -323,7 +329,7 @@ class DataAnalysisAgent:
             # Execute agent
             logger.info("Executing data cleaning agent...")
             result_dict = self.data_cleaning_agent.invoke_agent(
-                data_raw=data_path,  # This will be a URL, agent should handle it
+                data_raw=data_df,  # Pass DataFrame instead of URL
                 user_instructions=params["user_instructions"],
                 max_retries=3
             )
@@ -379,6 +385,12 @@ class DataAnalysisAgent:
         start_time = time.time()
         
         try:
+            # Load data as DataFrame
+            if data_path.startswith(('http://', 'https://')):
+                data_df = pd.read_csv(data_path)
+            else:
+                data_df = pd.read_csv(data_path)
+            
             # Map parameters
             params = self.parameter_mapper.map_feature_engineering_parameters(
                 request, intent, data_path, target_variable
@@ -387,8 +399,9 @@ class DataAnalysisAgent:
             # Execute agent
             logger.info("Executing feature engineering agent...")
             result_dict = self.feature_engineering_agent.invoke_agent(
-                data_raw=data_path,
+                data_raw=data_df,
                 user_instructions=params["user_instructions"],
+                target_variable=target_variable,
                 max_retries=3
             )
             result_str = str(result_dict)
@@ -443,6 +456,12 @@ class DataAnalysisAgent:
         start_time = time.time()
         
         try:
+            # Load data as DataFrame
+            if data_path.startswith(('http://', 'https://')):
+                data_df = pd.read_csv(data_path)
+            else:
+                data_df = pd.read_csv(data_path)
+            
             # Map parameters
             params = self.parameter_mapper.map_h2o_ml_parameters(
                 request, intent, data_path, target_variable
@@ -451,8 +470,9 @@ class DataAnalysisAgent:
             # Execute agent
             logger.info("Executing H2O ML agent...")
             result_dict = self.h2o_ml_agent.invoke_agent(
-                data_raw=data_path,
+                data_raw=data_df,
                 user_instructions=params["user_instructions"],
+                target_variable=target_variable,
                 max_retries=3
             )
             result_str = str(result_dict)
@@ -516,6 +536,17 @@ class DataAnalysisAgent:
         # Calculate analysis quality score
         analysis_quality = self._calculate_analysis_quality(agent_results, intent)
         
+        # Collect warnings from multiple sources
+        warnings = self._collect_warnings(agent_results)
+        
+        # Add warnings for invalid URLs or data access issues
+        if data_shape.get("rows") == "unknown" and data_shape.get("columns") == "unknown":
+            warnings.append("Could not access or load the provided dataset")
+        
+        # Add warnings for low confidence intent parsing
+        if intent.intent_confidence < 0.3:
+            warnings.append("Low confidence in understanding the request - results may not meet expectations")
+        
         return DataAnalysisResult(
             total_runtime_seconds=total_runtime,
             original_request=request.user_request,
@@ -533,7 +564,7 @@ class DataAnalysisAgent:
             data_story=data_story,
             analysis_quality_score=analysis_quality,
             confidence_level=confidence_level,
-            warnings=self._collect_warnings(agent_results),
+            warnings=warnings,
             limitations=self._identify_limitations(agent_results, intent)
         )
     
@@ -618,6 +649,8 @@ class DataAnalysisAgent:
     
     def _determine_confidence_level(self, agent_results: List[AgentExecutionResult], intent: WorkflowIntent) -> str:
         """Determine confidence level in results."""
+        if not agent_results:
+            return "low"
         success_rate = sum(1 for result in agent_results if result.success) / len(agent_results)
         if success_rate >= 0.8:
             return "high"
@@ -628,6 +661,8 @@ class DataAnalysisAgent:
     
     def _calculate_analysis_quality(self, agent_results: List[AgentExecutionResult], intent: WorkflowIntent) -> float:
         """Calculate overall analysis quality score."""
+        if not agent_results:
+            return 0.0
         base_score = sum(1 for result in agent_results if result.success) / len(agent_results)
         confidence_bonus = intent.intent_confidence * 0.1
         return min(1.0, base_score + confidence_bonus)
@@ -686,6 +721,8 @@ class DataAnalysisAgent:
             agents_executed=[],
             agent_results=[],
             overall_data_quality_score=0.0,
+            feature_engineering_effectiveness=0.0,  # Explicitly set Optional fields
+            model_performance_score=0.0,  # Explicitly set Optional fields
             key_insights=["Analysis failed due to error"],
             recommendations=["Please check the data source and request"],
             data_story=f"Analysis failed: {error_message}",

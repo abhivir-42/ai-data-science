@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/7fa269f98f53408596472d13191fe5c2/artifacts
+end_time: 1750723625074
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: 7fa269f98f53408596472d13191fe5c2
+run_name: unequaled-donkey-472
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750723499575
+status: 4
+tags: []
+user_id: abhivir42

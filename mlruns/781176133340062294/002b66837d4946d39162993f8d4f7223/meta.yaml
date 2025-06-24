@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/002b66837d4946d39162993f8d4f7223/artifacts
+end_time: 1750718743827
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: 002b66837d4946d39162993f8d4f7223
+run_name: stately-grub-50
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750718121106
+status: 3
+tags: []
+user_id: abhivir42

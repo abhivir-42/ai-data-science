@@ -153,7 +153,7 @@ Based on this information, analyze the user's request and provide a structured w
         data_info: Optional[Dict[str, Any]] = None
     ) -> WorkflowIntent:
         """
-        Synchronously parse user intent (wrapper around async method).
+        Synchronously parse user intent from request and dataset information.
         
         Args:
             user_request: Natural language request from user
@@ -163,7 +163,32 @@ Based on this information, analyze the user's request and provide a structured w
         Returns:
             WorkflowIntent object with parsed requirements
         """
-        return asyncio.run(self.parse_intent_async(user_request, csv_url, data_info))
+        try:
+            # Prepare the input data
+            input_data = {
+                "user_request": user_request,
+                "csv_url": csv_url,
+                "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
+                "column_names": data_info.get("columns", []) if data_info else [],
+                "data_types": data_info.get("dtypes", {}) if data_info else {},
+                "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                "format_instructions": self.output_parser.get_format_instructions()
+            }
+            
+            # Use synchronous invoke instead of asyncio.run()
+            result = self.chain.invoke(input_data)
+            
+            logger.info(f"Successfully parsed intent with confidence: {result.intent_confidence}")
+            return result
+            
+        except OutputParserException as e:
+            logger.error(f"Failed to parse LLM output: {e}")
+            # Return a fallback intent
+            return self._create_fallback_intent(user_request)
+            
+        except Exception as e:
+            logger.error(f"Unexpected error in intent parsing: {e}")
+            return self._create_fallback_intent(user_request)
     
     def _create_fallback_intent(self, user_request: str) -> WorkflowIntent:
         """

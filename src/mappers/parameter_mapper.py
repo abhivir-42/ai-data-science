@@ -73,6 +73,11 @@ class AgentParameterMapper:
             "bypass_explain_code": intent.complexity_level == "simple",  # Skip explanations for simple requests
             "checkpointer": None,  # No checkpointing for now
             
+            # Data cleaning specific parameters (from request)
+            "missing_threshold": request.missing_threshold,
+            "outlier_detection": request.outlier_detection,
+            "duplicate_removal": request.duplicate_removal,
+            
             # User instructions (enhanced from basic approach)
             "user_instructions": self._create_cleaning_instructions(request, intent, csv_url)
         }

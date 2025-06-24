@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/aad85329e37d4436a0de8446281ca052/artifacts
+end_time: 1750718741068
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: aad85329e37d4436a0de8446281ca052
+run_name: flawless-stag-842
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750718133718
+status: 3
+tags: []
+user_id: abhivir42

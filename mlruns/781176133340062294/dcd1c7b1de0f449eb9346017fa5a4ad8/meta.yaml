@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/dcd1c7b1de0f449eb9346017fa5a4ad8/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: dcd1c7b1de0f449eb9346017fa5a4ad8
+run_name: languid-calf-91
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750723886244
+status: 1
+tags: []
+user_id: abhivir42

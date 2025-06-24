@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/500cd0d92ac24ef59311ceec926e1c24/artifacts
+end_time: 1750723827535
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: 500cd0d92ac24ef59311ceec926e1c24
+run_name: valuable-sloth-1000
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750722822496
+status: 3
+tags: []
+user_id: abhivir42

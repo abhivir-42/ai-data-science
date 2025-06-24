@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/d2cb3b5162b54f288aff16a14c6f3b71/artifacts
+end_time: 1750723773857
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: d2cb3b5162b54f288aff16a14c6f3b71
+run_name: rumbling-panda-776
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750723645237
+status: 4
+tags: []
+user_id: abhivir42

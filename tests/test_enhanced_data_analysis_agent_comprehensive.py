@@ -395,7 +395,7 @@ class TestParameterMapper:
     def test_mapper_initialization(self, mapper):
         """Test parameter mapper initializes correctly"""
         assert mapper is not None
-        assert mapper.base_output_dir == "test_outputs"
+        assert str(mapper.base_output_dir) == "test_outputs"
     
     def test_get_timestamp(self, mapper):
         """Test timestamp generation"""

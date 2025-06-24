@@ -86,18 +86,20 @@ def extract_target_from_query(query_text, dataset_name):
         if match:
             return match.group(1)
     
-    # Look for "predict X" patterns
+    # Look for "predict X", "regression on X", etc patterns
     predict_patterns = [
-        r'predict\s+["\']?(\w+)["\']?',
-        r'predicting\s+["\']?(\w+)["\']?',
-        r'classification\s+of\s+["\']?(\w+)["\']?',
-        r'regression\s+on\s+["\']?(\w+)["\']?'
+        r'predict(?:ing)?\s+(?:the\s+)?["\']?(\w+)["\']?',
+        r'predicting\s+(?:the\s+)?["\']?(\w+)["\']?',
+        r'classification\s+of\s+(?:the\s+)?["\']?(\w+)["\']?',
+        r'regression\s+on\s+(?:the\s+)?["\']?(\w+)["\']?',
+        r'model(?:ing)?\s+(?:for\s+|to\s+predict\s+)?(?:the\s+)?["\']?(\w+)["\']?',
+        r'target\s+(?:variable\s+)?(?:is\s+)?["\']?(\w+)["\']?'
     ]
     
     import re
     for pattern in predict_patterns:
         match = re.search(pattern, query_lower)
-        if match:
+        if match and match.group(1) not in ['the', 'a', 'an', 'this', 'that']:
             return match.group(1)
     
     # Return common target for the dataset
@@ -129,15 +131,30 @@ def data_analysis_agent_func(query):
         if isinstance(query, str):
             user_request = query
             
+            # Check if this is a complex LLM-generated response (contains steps, code, etc.)
+            if "Step " in user_request or "```python" in user_request or len(user_request) > 500:
+                # Extract the core request from complex LLM response
+                lines = user_request.split('\n')
+                for line in lines:
+                    if any(keyword in line.lower() for keyword in ['clean', 'analyze', 'predict', 'model', 'regression', 'classification']):
+                        if not line.startswith('```') and not line.startswith('#'):
+                            user_request = line.strip()
+                            break
+                
+                # If we couldn't extract a simple request, create one
+                if "Step " in user_request or "```python" in user_request:
+                    user_request = "Clean the dataset and perform comprehensive data analysis with machine learning modeling"
+            
             # Smart dataset detection from query text
-            detected_url, detected_dataset = detect_dataset_from_query(query)
+            detected_url, detected_dataset = detect_dataset_from_query(user_request)
             csv_url = detected_url
             
             # Smart target variable extraction
-            target_variable = extract_target_from_query(query, detected_dataset)
+            target_variable = extract_target_from_query(user_request, detected_dataset)
             
             print(f"🔍 Detected dataset: {detected_dataset}")
             print(f"🎯 Detected target: {target_variable}")
+            print(f"📝 Processed request: {user_request[:100]}{'...' if len(user_request) > 100 else ''}")
             
         elif isinstance(query, dict):
             # Extract parameters from dict
@@ -205,7 +222,7 @@ Example: "Analyze the iris dataset for classification"
 🎉 **DATA ANALYSIS COMPLETE**
 ================================
 
-📋 **Original Request**: {result.original_request}
+📋 **Original Request**: {result.original_request[:200]}{'...' if len(result.original_request) > 200 else ''}
 📊 **Dataset**: {result.csv_url}
 📏 **Data Shape**: {result.data_shape}
 ⏱️ **Runtime**: {result.total_runtime_seconds:.2f} seconds
@@ -253,6 +270,8 @@ Sorry, I encountered an issue: {str(e)}
 **Need help?** Try: "Clean and analyze the iris dataset for species classification"
 """
         print(f"❌ Error in data analysis agent: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return error_msg
 
 # Register the data analysis agent via uAgent (EXACT pattern from LangGraph example)
