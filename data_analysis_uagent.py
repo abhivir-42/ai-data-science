@@ -37,7 +37,7 @@ if not API_TOKEN:
 data_analysis_agent = DataAnalysisAgent(
     output_dir="output/data_analysis_uagent/",
     intent_parser_model="gpt-4o-mini",
-    enable_async=False  # Use synchronous mode for uAgent compatibility
+    enable_async=False  # Keep synchronous for uAgent stability, but optimized with multi-threading
 )
 
 def data_analysis_agent_func(query):

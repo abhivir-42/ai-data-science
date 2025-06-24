@@ -628,8 +628,14 @@ def make_h2o_ml_agent(
                         path_to_save = model_directory if model_directory else log_path
                         model_path = h2o.save_model(model=aml.leader, path=path_to_save, force=True)
 
-                    # Leaderboard (DataFrame -> dict)
-                    leaderboard_df = pd.DataFrame(aml.leaderboard)
+                    # Leaderboard (DataFrame -> dict) - Use multi-threaded conversion for performance
+                    try:
+                        # Try multi-threaded conversion first (faster)
+                        leaderboard_df = aml.leaderboard.as_data_frame(use_multi_thread=True)
+                    except Exception:
+                        # Fallback to single-threaded if multi-threaded fails
+                        leaderboard_df = aml.leaderboard.as_data_frame()
+                    
                     leaderboard_dict = leaderboard_df.to_dict()
 
                     # Gather top-model metrics from the first row

@@ -1,4 +1,3 @@
-
 from typing import Optional, Dict, Any, Union, List
 from langchain.tools import tool
 
@@ -156,8 +155,14 @@ def train_h2o_automl(
             path_to_save = model_directory if model_directory else log_path
             model_path = h2o.save_model(model=aml.leader, path=path_to_save, force=True)
 
-        # Leaderboard (DataFrame -> dict)
-        leaderboard_df = aml.leaderboard.as_data_frame()
+        # Leaderboard (DataFrame -> dict) - Use multi-threaded conversion for performance
+        try:
+            # Try multi-threaded conversion first (faster)
+            leaderboard_df = aml.leaderboard.as_data_frame(use_multi_thread=True)
+        except Exception:
+            # Fallback to single-threaded if multi-threaded fails
+            leaderboard_df = aml.leaderboard.as_data_frame()
+        
         leaderboard_dict = leaderboard_df.to_dict()
 
         # Gather top-model metrics from the first row
@@ -233,7 +238,7 @@ fold_column: Specifies a column with cross-validation fold index assignment per 
 weights_column: Specifies a column with observation weights. Giving some observation a weight of zero is equivalent to excluding it from the dataset; giving an observation a relative weight of 2 is equivalent to repeating that row twice. Negative weights are not allowed.
 
 Optional Miscellaneous Parameters
-nfolds: Specify a value >= 2 for the number of folds for k-fold cross-validation of the models in the AutoML run or specify “-1” to let AutoML choose if k-fold cross-validation or blending mode should be used. Blending mode will use part of training_frame (if no blending_frame is provided) to train Stacked Ensembles. Use 0 to disable cross-validation; this will also disable Stacked Ensembles (thus decreasing the overall best model performance). This value defaults to “-1”.
+nfolds: Specify a value >= 2 for the number of folds for k-fold cross-validation of the models in the AutoML run or specify "-1" to let AutoML choose if k-fold cross-validation or blending mode should be used. Blending mode will use part of training_frame (if no blending_frame is provided) to train Stacked Ensembles. Use 0 to disable cross-validation; this will also disable Stacked Ensembles (thus decreasing the overall best model performance). This value defaults to "-1".
 
 balance_classes: Specify whether to oversample the minority classes to balance the class distribution. This option is not enabled by default and can increase the data frame size. This option is only applicable for classification. If the oversampled size of the dataset exceeds the maximum size calculated using the max_after_balance_size parameter, then the majority classes will be undersampled to satisfy the size limit.
 
@@ -310,7 +315,7 @@ export_checkpoints_dir: Specify a directory to which generated models will autom
 
 Notes
 Validation Options
-If the user turns off cross-validation by setting nfolds == 0, then cross-validation metrics will not be available to populate the leaderboard. In this case, we need to make sure there is a holdout frame (i.e. the “leaderboard frame”) to score the models on so that we can generate model performance metrics for the leaderboard. Without cross-validation, we will also require a validation frame to be used for early stopping on the models. Therefore, if either of these frames are not provided by the user, they will be automatically partitioned from the training data. If either frame is missing, 10% of the training data will be used to create a missing frame (if both are missing then a total of 20% of the training data will be used to create a 10% validation and 10% leaderboard frame).
+If the user turns off cross-validation by setting nfolds == 0, then cross-validation metrics will not be available to populate the leaderboard. In this case, we need to make sure there is a holdout frame (i.e. the "leaderboard frame") to score the models on so that we can generate model performance metrics for the leaderboard. Without cross-validation, we will also require a validation frame to be used for early stopping on the models. Therefore, if either of these frames are not provided by the user, they will be automatically partitioned from the training data. If either frame is missing, 10% of the training data will be used to create a missing frame (if both are missing then a total of 20% of the training data will be used to create a 10% validation and 10% leaderboard frame).
 
 XGBoost Memory Requirements
 XGBoost, which is included in H2O as a third party library, requires its own memory outside the H2O (Java) cluster. When running AutoML with XGBoost (it is included by default), be sure you allow H2O no more than 2/3 of the total available RAM. Example: If you have 60G RAM, use h2o.init(max_mem_size = "40G"), leaving 20G for XGBoost.
@@ -324,7 +329,7 @@ AutoML objects are fully supported though the H2O Model Explainability interface
 Code Examples
 
 Training
-Here’s an example showing basic usage of the h2o.automl() function in R and the H2OAutoML class in Python. For demonstration purposes only, we explicitly specify the x argument, even though on this dataset, that’s not required. With this dataset, the set of predictors is all columns other than the response. Like other H2O algorithms, the default value of x is “all columns, excluding y”, so that will produce the same result.
+Here's an example showing basic usage of the h2o.automl() function in R and the H2OAutoML class in Python. For demonstration purposes only, we explicitly specify the x argument, even though on this dataset, that's not required. With this dataset, the set of predictors is all columns other than the response. Like other H2O algorithms, the default value of x is "all columns, excluding y", so that will produce the same result.
 
 ``` python
 import h2o
@@ -401,7 +406,7 @@ preds = aml.leader.predict(test)
 AutoML Output
 
 Leaderboard
-The AutoML object includes a “leaderboard” of models that were trained in the process, including the 5-fold cross-validated model performance (by default). The number of folds used in the model evaluation process can be adjusted using the nfolds parameter. If you would like to score the models on a specific dataset, you can specify the leaderboard_frame argument in the AutoML run, and then the leaderboard will show scores on that dataset instead.
+The AutoML object includes a "leaderboard" of models that were trained in the process, including the 5-fold cross-validated model performance (by default). The number of folds used in the model evaluation process can be adjusted using the nfolds parameter. If you would like to score the models on a specific dataset, you can specify the leaderboard_frame argument in the AutoML run, and then the leaderboard will show scores on that dataset instead.
 
 The models are ranked by a default metric based on the problem type (the second column of the leaderboard). In binary classification problems, that metric is AUC, and in multiclass classification problems, the metric is mean per-class error. In regression problems, the default sort metric is RMSE. Some additional metrics are also provided, for convenience.
 
@@ -485,7 +490,7 @@ Particular algorithms (or groups of algorithms) can be switched off using the ex
 
 A list of the hyperparameters searched over for each algorithm in the AutoML process is included in the appendix below. More details about the hyperparameter ranges for the models in addition to the hard-coded models will be added to the appendix at a later date.
 
-AutoML trains several Stacked Ensemble models during the run (unless ensembles are turned off using exclude_algos). We have subdivided the model training in AutoML into “model groups” with different priority levels. After each group is completed, and at the very end of the AutoML process, we train (at most) two additional Stacked Ensembles with the existing models. There are currently two types of Stacked Ensembles: one which includes all the base models (“All Models”), and one comprised only of the best model from each algorithm family (“Best of Family”). The Best of Family ensembles are more optimized for production use since it only contains six (or fewer) base models. It should be relatively fast to use in production (to generate predictions on new data) without much degradation in model performance when compared to the final “All Models” ensemble, for example. This may be useful if you want the model performance boost from ensembling without the added time or complexity of a large ensemble. You can also inspect some of the earlier “All Models” Stacked Ensembles that have fewer models as an alternative to the Best of Family ensembles. The metalearner used in all ensembles is a variant of the default Stacked Ensemble metalearner: a non-negative GLM with regularization (Lasso or Elastic net, chosen by CV) to encourage more sparse ensembles. The metalearner also uses a logit transform (on the base learner CV preds) for classification tasks before training.
+AutoML trains several Stacked Ensemble models during the run (unless ensembles are turned off using exclude_algos). We have subdivided the model training in AutoML into "model groups" with different priority levels. After each group is completed, and at the very end of the AutoML process, we train (at most) two additional Stacked Ensembles with the existing models. There are currently two types of Stacked Ensembles: one which includes all the base models ("All Models"), and one comprised only of the best model from each algorithm family ("Best of Family"). The Best of Family ensembles are more optimized for production use since it only contains six (or fewer) base models. It should be relatively fast to use in production (to generate predictions on new data) without much degradation in model performance when compared to the final "All Models" ensemble, for example. This may be useful if you want the model performance boost from ensembling without the added time or complexity of a large ensemble. You can also inspect some of the earlier "All Models" Stacked Ensembles that have fewer models as an alternative to the Best of Family ensembles. The metalearner used in all ensembles is a variant of the default Stacked Ensemble metalearner: a non-negative GLM with regularization (Lasso or Elastic net, chosen by CV) to encourage more sparse ensembles. The metalearner also uses a logit transform (on the base learner CV preds) for classification tasks before training.
 
 For information about how previous versions of AutoML were different than the current one, there's a brief description here.
 
@@ -512,7 +517,7 @@ AutoML includes XGBoost GBMs (Gradient Boosting Machines) among its set of algor
 
 5. Why doesn't AutoML use all the time that it's given?
 
-If you're using 3.34.0.1 or later, AutoML should use all the time that it's given using max_runtime_secs. However, if you're using an earlier version, then early stopping was enabled by default and you can stop early. With early stopping, AutoML will stop once there's no longer “enough” incremental improvement. The user can tweak the early stopping paramters to be more or less sensitive. Set stopping_rounds higher if you want to slow down early stopping and let AutoML train more models before it stops.
+If you're using 3.34.0.1 or later, AutoML should use all the time that it's given using max_runtime_secs. However, if you're using an earlier version, then early stopping was enabled by default and you can stop early. With early stopping, AutoML will stop once there's no longer "enough" incremental improvement. The user can tweak the early stopping paramters to be more or less sensitive. Set stopping_rounds higher if you want to slow down early stopping and let AutoML train more models before it stops.
 
 6. Does AutoML support MOJOs?
 
@@ -520,7 +525,7 @@ AutoML will always produce a model which has a MOJO. Though it depends on the ru
 
 7. Why doesn't AutoML use all the time that it's given?
 
-If you're using 3.34.0.1 or later, AutoML should use all the time that it's given using max_runtime_secs. However, if you're using an earlier version, then early stopping was enabled by default and you can stop early. With early stopping, AutoML will stop once there's no longer “enough” incremental improvement. The user can tweak the early stopping paramters to be more or less sensitive. Set stopping_rounds higher if you want to slow down early stopping and let AutoML train more models before it stops.
+If you're using 3.34.0.1 or later, AutoML should use all the time that it's given using max_runtime_secs. However, if you're using an earlier version, then early stopping was enabled by default and you can stop early. With early stopping, AutoML will stop once there's no longer "enough" incremental improvement. The user can tweak the early stopping paramters to be more or less sensitive. Set stopping_rounds higher if you want to slow down early stopping and let AutoML train more models before it stops.
 
 8. What is the history of H2O AutoML?
 
