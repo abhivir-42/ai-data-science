@@ -73,16 +73,25 @@ Your job is to intelligently determine:
 - Suggested target variable for ML (if applicable)
 - Complexity level and confidence scores
 
-Be intelligent and nuanced in your analysis. Look for implicit requirements and make educated suggestions based on the data characteristics and user intent.
+CRITICAL PARSING RULES:
+- ONLY set needs_data_cleaning=true if the user explicitly mentions cleaning, preprocessing, data quality, missing values, duplicates, or outliers
+- ONLY set needs_feature_engineering=true if the user explicitly mentions features, encoding, transformations, or feature creation
+- ONLY set needs_ml_modeling=true if the user explicitly mentions prediction, modeling, classification, regression, or machine learning
+- Be PRECISE and LITERAL in your interpretation - don't assume additional steps unless explicitly requested
+- If the user only asks for cleaning, do NOT assume they want feature engineering or ML
+- If the user only asks for ML, then yes, they likely need cleaning and feature engineering as prerequisites
 
-IMPORTANT GUIDELINES:
-- If the user mentions prediction, classification, or modeling, they likely need ML
-- If they mention cleaning, missing values, or data quality, they need data cleaning
-- If they mention features, encoding, or transformations, they need feature engineering
-- Consider the dataset characteristics when making suggestions
-- Be conservative with confidence scores - only use high confidence when very certain
-- Extract key requirements as specific, actionable items
-- Assess complexity based on the scope and sophistication of the request"""
+RESPONSE REQUIREMENTS:
+- You MUST respond with valid JSON that matches the exact schema provided
+- Set intent_confidence between 0.7-1.0 for clear requests, 0.3-0.6 for ambiguous ones
+- Use "simple" complexity for single-step requests, "moderate" for multi-step, "complex" for advanced analysis
+- Extract 1-3 key requirements as specific, actionable items
+- Only suggest target variables if ML is clearly needed and you can identify a likely target from the data
+
+EXAMPLES:
+- "Clean the dataset" → needs_data_cleaning=true, needs_feature_engineering=false, needs_ml_modeling=false
+- "Build a model to predict X" → needs_data_cleaning=true, needs_feature_engineering=true, needs_ml_modeling=true
+- "Engineer features for the data" → needs_data_cleaning=false, needs_feature_engineering=true, needs_ml_modeling=false"""
 
         user_prompt = """USER REQUEST: {user_request}
 
@@ -106,7 +115,8 @@ Based on this information, analyze the user's request and provide a structured w
         self,
         user_request: str,
         csv_url: str,
-        data_info: Optional[Dict[str, Any]] = None
+        data_info: Optional[Dict[str, Any]] = None,
+        max_retries: int = 3
     ) -> WorkflowIntent:
         """
         Asynchronously parse user intent from request and dataset information.
@@ -115,42 +125,54 @@ Based on this information, analyze the user's request and provide a structured w
             user_request: Natural language request from user
             csv_url: URL to the CSV file
             data_info: Dictionary containing dataset information
+            max_retries: Maximum number of retry attempts
             
         Returns:
             WorkflowIntent object with parsed requirements
         """
-        try:
-            # Prepare the input data
-            input_data = {
-                "user_request": user_request,
-                "csv_url": csv_url,
-                "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
-                "column_names": data_info.get("columns", []) if data_info else [],
-                "data_types": data_info.get("dtypes", {}) if data_info else {},
-                "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
-                "format_instructions": self.output_parser.get_format_instructions()
-            }
-            
-            # Invoke the chain
-            result = await self.chain.ainvoke(input_data)
-            
-            logger.info(f"Successfully parsed intent with confidence: {result.intent_confidence}")
-            return result
-            
-        except OutputParserException as e:
-            logger.error(f"Failed to parse LLM output: {e}")
-            # Return a fallback intent
-            return self._create_fallback_intent(user_request)
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in intent parsing: {e}")
-            return self._create_fallback_intent(user_request)
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Prepare the input data
+                input_data = {
+                    "user_request": user_request,
+                    "csv_url": csv_url,
+                    "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
+                    "column_names": data_info.get("columns", []) if data_info else [],
+                    "data_types": data_info.get("dtypes", {}) if data_info else {},
+                    "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "format_instructions": self.output_parser.get_format_instructions()
+                }
+                
+                # Invoke the chain
+                result = await self.chain.ainvoke(input_data)
+                
+                logger.info(f"Successfully parsed intent with confidence: {result.intent_confidence}")
+                return result
+                
+            except OutputParserException as e:
+                last_error = e
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} - Failed to parse LLM output: {e}")
+                if attempt < max_retries - 1:
+                    continue  # Retry
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} - Unexpected error in intent parsing: {e}")
+                if attempt < max_retries - 1:
+                    continue  # Retry
+        
+        # If all retries failed, raise the last error instead of using fallback
+        logger.error(f"Intent parsing failed after {max_retries} attempts. Last error: {last_error}")
+        raise RuntimeError(f"Intent parsing failed after {max_retries} attempts: {last_error}")
     
     def parse_intent(
         self,
         user_request: str,
         csv_url: str,
-        data_info: Optional[Dict[str, Any]] = None
+        data_info: Optional[Dict[str, Any]] = None,
+        max_retries: int = 3
     ) -> WorkflowIntent:
         """
         Synchronously parse user intent from request and dataset information.
@@ -159,84 +181,49 @@ Based on this information, analyze the user's request and provide a structured w
             user_request: Natural language request from user
             csv_url: URL to the CSV file
             data_info: Dictionary containing dataset information
+            max_retries: Maximum number of retry attempts
             
         Returns:
             WorkflowIntent object with parsed requirements
         """
-        try:
-            # Prepare the input data
-            input_data = {
-                "user_request": user_request,
-                "csv_url": csv_url,
-                "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
-                "column_names": data_info.get("columns", []) if data_info else [],
-                "data_types": data_info.get("dtypes", {}) if data_info else {},
-                "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
-                "format_instructions": self.output_parser.get_format_instructions()
-            }
-            
-            # Use synchronous invoke instead of asyncio.run()
-            result = self.chain.invoke(input_data)
-            
-            logger.info(f"Successfully parsed intent with confidence: {result.intent_confidence}")
-            return result
-            
-        except OutputParserException as e:
-            logger.error(f"Failed to parse LLM output: {e}")
-            # Return a fallback intent
-            return self._create_fallback_intent(user_request)
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in intent parsing: {e}")
-            return self._create_fallback_intent(user_request)
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # Prepare the input data
+                input_data = {
+                    "user_request": user_request,
+                    "csv_url": csv_url,
+                    "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
+                    "column_names": data_info.get("columns", []) if data_info else [],
+                    "data_types": data_info.get("dtypes", {}) if data_info else {},
+                    "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "format_instructions": self.output_parser.get_format_instructions()
+                }
+                
+                # Use synchronous invoke
+                result = self.chain.invoke(input_data)
+                
+                logger.info(f"Successfully parsed intent with confidence: {result.intent_confidence}")
+                return result
+                
+            except OutputParserException as e:
+                last_error = e
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} - Failed to parse LLM output: {e}")
+                if attempt < max_retries - 1:
+                    continue  # Retry
+                    
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} - Unexpected error in intent parsing: {e}")
+                if attempt < max_retries - 1:
+                    continue  # Retry
+        
+        # If all retries failed, raise the last error instead of using fallback
+        logger.error(f"Intent parsing failed after {max_retries} attempts. Last error: {last_error}")
+        raise RuntimeError(f"Intent parsing failed after {max_retries} attempts: {last_error}")
     
-    def _create_fallback_intent(self, user_request: str) -> WorkflowIntent:
-        """
-        Create a fallback intent when parsing fails.
-        
-        Args:
-            user_request: Original user request
-            
-        Returns:
-            Basic WorkflowIntent with conservative assumptions
-        """
-        # Simple keyword-based fallback (better than nothing)
-        request_lower = user_request.lower()
-        
-        # Determine basic needs
-        needs_cleaning = any(keyword in request_lower for keyword in [
-            'clean', 'missing', 'null', 'duplicate', 'outlier', 'preprocess'
-        ])
-        
-        needs_feature_engineering = any(keyword in request_lower for keyword in [
-            'feature', 'encode', 'transform', 'engineer', 'categorical'
-        ])
-        
-        needs_ml_modeling = any(keyword in request_lower for keyword in [
-            'model', 'predict', 'classification', 'regression', 'machine learning', 'ml'
-        ])
-        
-        # If nothing specific is mentioned, assume they want everything
-        if not (needs_cleaning or needs_feature_engineering or needs_ml_modeling):
-            needs_cleaning = True
-            needs_feature_engineering = True
-            needs_ml_modeling = True
-        
-        return WorkflowIntent(
-            needs_data_cleaning=needs_cleaning,
-            needs_feature_engineering=needs_feature_engineering,
-            needs_ml_modeling=needs_ml_modeling,
-            data_quality_focus=needs_cleaning,
-            exploratory_analysis=True,
-            prediction_focus=needs_ml_modeling,
-            statistical_analysis=True,
-            suggested_target_variable=None,
-            suggested_problem_type=ProblemType.AUTO,
-            key_requirements=["Analyze the provided dataset"],
-            complexity_level="moderate",
-            intent_confidence=0.3,  # Low confidence for fallback
-            target_variable_confidence=None
-        )
+
     
     def get_data_preview(self, csv_url: str, max_rows: int = 5) -> Dict[str, Any]:
         """

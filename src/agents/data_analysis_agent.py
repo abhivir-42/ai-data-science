@@ -776,7 +776,14 @@ class DataAnalysisAgent:
             
             # Step 2: Parse workflow intent with the detected CSV URL
             logger.info("Parsing workflow intent...")
-            intent = self.intent_parser.parse_with_data_preview(text_input, csv_url)
+            try:
+                intent = self.intent_parser.parse_with_data_preview(text_input, csv_url)
+            except RuntimeError as e:
+                return self._create_error_result(
+                    csv_url, 
+                    text_input, 
+                    f"Failed to parse your request after multiple attempts. Please rephrase your request more clearly. Error: {str(e)}"
+                )
             
             # Step 3: Determine adaptive runtime based on dataset size
             data_shape = self._get_data_shape(csv_url)
