@@ -2,10 +2,12 @@
 """
 Data Analysis uAgent Implementation
 
-Following EXACTLY the Fetch.ai LangGraph adapter example:
-https://innovationlab.fetch.ai/resources/docs/examples/adapters/langgraph-adapter-example
-
+Following the Fetch.ai LangGraph adapter example pattern.
 This wraps the DataAnalysisAgent as a uAgent for deployment on ASI:One.
+
+Unlike the supervisor_uagent.py, this leverages the full structured output
+capabilities of the enhanced DataAnalysisAgent with proper schema validation
+and intelligent parameter mapping.
 """
 
 import os
@@ -16,14 +18,13 @@ from dotenv import load_dotenv
 # Add src to path
 sys.path.append('src')
 
-from langchain_openai import ChatOpenAI
 from uagents_adapter import LangchainRegisterTool, cleanup_uagent
 from src.agents.data_analysis_agent import DataAnalysisAgent
 
 # Load environment variables
 load_dotenv()
 
-# Set API keys (exactly like the example)
+# Set API keys
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 API_TOKEN = os.environ.get("AGENTVERSE_API_TOKEN")
 
@@ -33,15 +34,14 @@ if not OPENAI_API_KEY:
 if not API_TOKEN:
     print("Warning: AGENTVERSE_API_TOKEN not set - will register locally only")
 
-# Set up model and data analysis agent (following exact LangGraph pattern)
-model = ChatOpenAI(temperature=0)
+# Initialize the enhanced data analysis agent
 data_analysis_agent = DataAnalysisAgent(
-    output_dir="output/data_analysis/",
+    output_dir="output/data_analysis_uagent/",
     intent_parser_model="gpt-4o-mini",
-    enable_async=False
+    enable_async=False  # Use synchronous mode for uAgent compatibility
 )
 
-# Dataset URL mappings for common datasets
+# Dataset URL mappings for convenience (optional fallback)
 DATASET_URLS = {
     'iris': 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/iris.csv',
     'titanic': 'https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv',
@@ -52,132 +52,83 @@ DATASET_URLS = {
     'flights': 'https://raw.githubusercontent.com/mwaskom/seaborn-data/master/flights.csv'
 }
 
-def detect_dataset_from_query(query_text):
-    """Detect dataset name from user query and return corresponding URL."""
+def detect_dataset_url(query_text):
+    """Simple dataset detection for convenience - fallback only."""
     query_lower = query_text.lower()
     
     for dataset_name, url in DATASET_URLS.items():
         if dataset_name in query_lower:
-            return url, dataset_name
+            return url
     
-    # Default to titanic if no specific dataset detected
-    return DATASET_URLS['titanic'], 'titanic'
+    return None
 
-def extract_target_from_query(query_text, dataset_name):
-    """Extract target variable based on query and dataset."""
-    query_lower = query_text.lower()
-    
-    # Common target variables by dataset
-    common_targets = {
-        'iris': 'species',
-        'titanic': 'survived', 
-        'wine': 'quality',
-        'boston': 'medv',
-        'diabetes': 'target',
-        'tips': 'tip',
-        'flights': 'passengers'
-    }
-    
-    # Look for explicit target mentions
-    if 'target' in query_lower and '=' in query_lower:
-        # Extract target=something pattern
-        import re
-        match = re.search(r'target[=:]\s*["\']?(\w+)["\']?', query_lower)
-        if match:
-            return match.group(1)
-    
-    # Look for "predict X", "regression on X", etc patterns
-    predict_patterns = [
-        r'predict(?:ing)?\s+(?:the\s+)?["\']?(\w+)["\']?',
-        r'predicting\s+(?:the\s+)?["\']?(\w+)["\']?',
-        r'classification\s+of\s+(?:the\s+)?["\']?(\w+)["\']?',
-        r'regression\s+on\s+(?:the\s+)?["\']?(\w+)["\']?',
-        r'model(?:ing)?\s+(?:for\s+|to\s+predict\s+)?(?:the\s+)?["\']?(\w+)["\']?',
-        r'target\s+(?:variable\s+)?(?:is\s+)?["\']?(\w+)["\']?'
-    ]
-    
-    import re
-    for pattern in predict_patterns:
-        match = re.search(pattern, query_lower)
-        if match and match.group(1) not in ['the', 'a', 'an', 'this', 'that']:
-            return match.group(1)
-    
-    # Return common target for the dataset
-    return common_targets.get(dataset_name, None)
-
-# Wrap data analysis agent into a function for UAgent (EXACTLY like LangGraph example)
 def data_analysis_agent_func(query):
     """
-    Enhanced data analysis agent function with intelligent dataset detection.
+    Enhanced data analysis agent function that leverages the full DataAnalysisAgent capabilities.
     
-    This handles input format conversion and returns the final structured response.
-    Supports:
-    - Automatic dataset detection from query text
-    - Common dataset URLs (iris, titanic, wine, etc.)
-    - Smart target variable extraction
-    - Robust error handling
-    - Structured output with comprehensive metrics
+    This wrapper:
+    - Handles input format conversion
+    - Leverages DataAnalysisAgent's structured input/output 
+    - Uses intelligent intent parsing and parameter mapping
+    - Returns comprehensive structured analysis results
+    - Supports both simple text and structured dict inputs
     """
-    # Handle input if it's a dict with 'input' key (EXACT pattern from example)
+    # Handle input if it's a dict with 'input' key (standard uAgent pattern)
     if isinstance(query, dict) and 'input' in query:
         query = query['input']
     
     try:
         csv_url = None
         user_request = None
-        target_variable = None
+        additional_params = {}
         
-        # Parse the query to extract required parameters
+        # Parse the query to extract parameters
         if isinstance(query, str):
             user_request = query
             
-            # Check if this is a complex LLM-generated response (contains steps, code, etc.)
-            if "Step " in user_request or "```python" in user_request or len(user_request) > 500:
-                # Extract the core request from complex LLM response
-                lines = user_request.split('\n')
-                for line in lines:
-                    if any(keyword in line.lower() for keyword in ['clean', 'analyze', 'predict', 'model', 'regression', 'classification']):
-                        if not line.startswith('```') and not line.startswith('#'):
-                            user_request = line.strip()
-                            break
-                
-                # If we couldn't extract a simple request, create one
-                if "Step " in user_request or "```python" in user_request:
-                    user_request = "Clean the dataset and perform comprehensive data analysis with machine learning modeling"
-            
-            # Smart dataset detection from query text
-            detected_url, detected_dataset = detect_dataset_from_query(user_request)
-            csv_url = detected_url
-            
-            # Smart target variable extraction
-            target_variable = extract_target_from_query(user_request, detected_dataset)
-            
-            print(f"🔍 Detected dataset: {detected_dataset}")
-            print(f"🎯 Detected target: {target_variable}")
-            print(f"📝 Processed request: {user_request[:100]}{'...' if len(user_request) > 100 else ''}")
+            # Try to detect dataset from query if no URL provided
+            detected_url = detect_dataset_url(query)
+            if detected_url:
+                csv_url = detected_url
+                print(f"🔍 Auto-detected dataset URL: {csv_url}")
             
         elif isinstance(query, dict):
-            # Extract parameters from dict
+            # Extract parameters from structured input
             user_request = query.get('user_request', query.get('query', ''))
             csv_url = query.get('csv_url')
-            target_variable = query.get('target_variable')
+            
+            # Extract additional DataAnalysisRequest parameters
+            additional_params = {
+                'target_variable': query.get('target_variable'),
+                'problem_type': query.get('problem_type'),
+                'max_runtime_minutes': query.get('max_runtime_minutes', 30),
+                'enable_advanced_features': query.get('enable_advanced_features', True),
+                'quality_threshold': query.get('quality_threshold', 0.8),
+                'performance_vs_speed': query.get('performance_vs_speed', 'balanced')
+            }
+            
+            # Remove None values
+            additional_params = {k: v for k, v in additional_params.items() if v is not None}
             
             # If no CSV URL provided, try to detect from request
             if not csv_url and user_request:
-                detected_url, detected_dataset = detect_dataset_from_query(user_request)
-                csv_url = detected_url
-                
-                # If no target provided, try to extract
-                if not target_variable:
-                    target_variable = extract_target_from_query(user_request, detected_dataset)
+                detected_url = detect_dataset_url(user_request)
+                if detected_url:
+                    csv_url = detected_url
+                    print(f"🔍 Auto-detected dataset URL: {csv_url}")
                     
         else:
             return """
 🚫 **Input Format Error**
 
 I need either:
-1. A simple text request like: "Analyze the iris dataset" 
-2. A structured request like: {"csv_url": "your-url", "user_request": "your-task"}
+1. A simple text request like: "Analyze the iris dataset for classification"
+2. A structured request like: {
+     "csv_url": "your-url", 
+     "user_request": "your-task",
+     "target_variable": "optional",
+     "problem_type": "classification|regression"
+   }
 
 **Supported datasets**: iris, titanic, wine, boston, diabetes, tips, flights
 """
@@ -188,103 +139,191 @@ I need either:
 🚫 **Missing Request**
 
 Please tell me what you'd like me to do! For example:
-- "Clean and analyze the iris dataset"
-- "Train a classification model on the titanic data"
-- "Perform feature engineering on the wine dataset"
+- "Analyze the iris dataset for species classification"
+- "Clean and engineer features for the titanic dataset"
+- "Build a regression model to predict wine quality"
+- "Perform complete ML pipeline on the flights dataset"
 """
         
         if not csv_url:
             return """
-🚫 **Dataset Not Found**
+🚫 **Dataset Required**
 
-I couldn't detect a dataset from your request. Please specify:
+Please provide either:
 - A known dataset name (iris, titanic, wine, boston, diabetes, tips, flights)
-- Or provide a direct CSV URL
+- A direct CSV URL in the request
+- A structured input with 'csv_url' field
 
 Example: "Analyze the iris dataset for classification"
+Or: {"csv_url": "https://your-url.com/data.csv", "user_request": "classify the data"}
 """
         
-        # Process the request using the data analysis agent
-        print(f"🚀 Processing request with:")
+        # Process the request using the enhanced DataAnalysisAgent
+        print(f"🚀 Processing enhanced data analysis request:")
         print(f"   📊 Dataset URL: {csv_url}")
         print(f"   📝 Request: {user_request}")
-        print(f"   🎯 Target: {target_variable}")
+        if additional_params:
+            print(f"   ⚙️  Additional params: {additional_params}")
         
-        # Call the data analysis agent with proper parameters
+        # Call the DataAnalysisAgent with structured parameters
         result = data_analysis_agent.analyze(
             csv_url=csv_url,
             user_request=user_request,
-            target_variable=target_variable
+            **additional_params
         )
         
-        # Convert structured result to string for uAgent compatibility
-        formatted_result = f"""
-🎉 **DATA ANALYSIS COMPLETE**
-================================
-
-📋 **Original Request**: {result.original_request[:200]}{'...' if len(result.original_request) > 200 else ''}
-📊 **Dataset**: {result.csv_url}
-📏 **Data Shape**: {result.data_shape}
-⏱️ **Runtime**: {result.total_runtime_seconds:.2f} seconds
-📈 **Analysis Quality**: {result.analysis_quality_score:.2f}
-🎯 **Confidence**: {result.confidence_level}
-
-🤖 **Agents Executed**: {', '.join(result.agents_executed)}
-
-📊 **Quality Metrics**:
-- Overall Data Quality: {result.overall_data_quality_score:.2f}
-- Feature Engineering Effectiveness: {result.feature_engineering_effectiveness or 'N/A'}
-- Model Performance: {result.model_performance_score or 'N/A'}
-
-💡 **Key Insights**:
-{chr(10).join([f"• {insight}" for insight in result.key_insights])}
-
-🎯 **Recommendations**:
-{chr(10).join([f"• {rec}" for rec in result.recommendations])}
-
-📖 **Data Story**:
-{result.data_story}
-
-📁 **Generated Files**:
-{chr(10).join([f"• {name}: {path}" for name, path in result.generated_files.items()])}
-
-{f"⚠️ **Warnings**: {', '.join(result.warnings)}" if result.warnings else ""}
-{f"⚠️ **Limitations**: {', '.join(result.limitations)}" if result.limitations else ""}
-
-✅ **Analysis completed successfully!**
-"""
-        
-        return formatted_result
+        # Format the structured result for display
+        return format_analysis_result(result)
         
     except Exception as e:
         error_msg = f"""
-🚫 **Technical Error**
+🚫 **Analysis Error**
 
-Sorry, I encountered an issue: {str(e)}
+Sorry, I encountered an issue during analysis: {str(e)}
 
 **Common solutions:**
 1. Check if the dataset URL is accessible
-2. Ensure your request is clear (e.g., "analyze iris dataset")
-3. Try specifying the target variable explicitly
+2. Ensure your request is clear and specific
+3. Try specifying the target variable explicitly for ML tasks
+4. Check that the dataset format is valid CSV
 
-**Need help?** Try: "Clean and analyze the iris dataset for species classification"
+**Need help?** Try: "Analyze the iris dataset for species classification"
 """
         print(f"❌ Error in data analysis agent: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return error_msg
 
-# Register the data analysis agent via uAgent (EXACT pattern from LangGraph example)
+def format_analysis_result(result) -> str:
+    """Format the DataAnalysisResult into a comprehensive string report."""
+    
+    if not result:
+        return "❌ No analysis result received"
+    
+    try:
+        # Build comprehensive report
+        lines = [
+            "🎉 **DATA ANALYSIS COMPLETE**",
+            "=" * 50,
+            "",
+            f"📊 **Dataset**: {result.csv_url}",
+            f"📝 **Request**: {result.original_request}",
+            f"📏 **Data Shape**: {result.data_shape.get('rows', 'unknown')} rows × {result.data_shape.get('columns', 'unknown')} columns",
+            f"⏱️  **Runtime**: {result.total_runtime_seconds:.2f} seconds",
+            f"🎯 **Confidence**: {result.confidence_level.upper()}",
+            f"⭐ **Quality Score**: {result.analysis_quality_score:.2f}/1.0",
+            ""
+        ]
+        
+        # Workflow information
+        if result.workflow_intent:
+            lines.extend([
+                "🔄 **WORKFLOW EXECUTED**:",
+                f"   • Data Cleaning: {'✅' if result.workflow_intent.needs_data_cleaning else '❌'}",
+                f"   • Feature Engineering: {'✅' if result.workflow_intent.needs_feature_engineering else '❌'}",
+                f"   • ML Modeling: {'✅' if result.workflow_intent.needs_ml_modeling else '❌'}",
+                f"   • Intent Confidence: {result.workflow_intent.intent_confidence:.2f}",
+                ""
+            ])
+        
+        # Agents executed
+        if result.agents_executed:
+            lines.extend([
+                "🤖 **AGENTS EXECUTED**:",
+                *[f"   • {agent.replace('_', ' ').title()}" for agent in result.agents_executed],
+                ""
+            ])
+        
+        # Performance metrics
+        metrics_added = False
+        if result.overall_data_quality_score is not None:
+            if not metrics_added:
+                lines.extend(["📈 **PERFORMANCE METRICS**:", ""])
+                metrics_added = True
+            lines.append(f"   • Data Quality: {result.overall_data_quality_score:.2f}/1.0")
+        
+        if result.feature_engineering_effectiveness is not None:
+            if not metrics_added:
+                lines.extend(["📈 **PERFORMANCE METRICS**:", ""])
+                metrics_added = True
+            lines.append(f"   • Feature Engineering: {result.feature_engineering_effectiveness:.2f}/1.0")
+        
+        if result.model_performance_score is not None:
+            if not metrics_added:
+                lines.extend(["📈 **PERFORMANCE METRICS**:", ""])
+                metrics_added = True
+            lines.append(f"   • Model Performance: {result.model_performance_score:.2f}/1.0")
+        
+        if metrics_added:
+            lines.append("")
+        
+        # Key insights
+        if result.key_insights:
+            lines.extend([
+                "💡 **KEY INSIGHTS**:",
+                *[f"   • {insight}" for insight in result.key_insights],
+                ""
+            ])
+        
+        # Recommendations
+        if result.recommendations:
+            lines.extend([
+                "🎯 **RECOMMENDATIONS**:",
+                *[f"   • {rec}" for rec in result.recommendations],
+                ""
+            ])
+        
+        # Generated files
+        if result.generated_files:
+            lines.extend([
+                "📁 **GENERATED FILES**:",
+                *[f"   • {name}: {path}" for name, path in result.generated_files.items()],
+                ""
+            ])
+        
+        # Warnings
+        if result.warnings:
+            lines.extend([
+                "⚠️  **WARNINGS**:",
+                *[f"   • {warning}" for warning in result.warnings],
+                ""
+            ])
+        
+        # Data story (AI narrative)
+        if result.data_story:
+            lines.extend([
+                "📖 **ANALYSIS NARRATIVE**:",
+                result.data_story,
+                ""
+            ])
+        
+        # Limitations
+        if result.limitations:
+            lines.extend([
+                "⚠️  **LIMITATIONS**:",
+                *[f"   • {limitation}" for limitation in result.limitations],
+                ""
+            ])
+        
+        lines.extend([
+            "=" * 50,
+            "✅ **Analysis completed successfully!**"
+        ])
+        
+        return "\n".join(lines)
+        
+    except Exception as e:
+        return f"❌ Error formatting result: {str(e)}\n\nRaw result: {str(result)}"
+
+# Register the enhanced data analysis agent via uAgent
 tool = LangchainRegisterTool()
 
-print("🚀 Registering data analysis uAgent...")
+print("🚀 Registering enhanced data analysis uAgent...")
 
 agent_info = tool.invoke(
     {
-        "agent_obj": data_analysis_agent_func,  # Pass the function
-        "name": "data_analysis_enhanced",
+        "agent_obj": data_analysis_agent_func,
+        "name": "enhanced_data_analysis",
         "port": 8102,
-        "description": "An enhanced data analysis agent with structured outputs that orchestrates comprehensive data science workflows including data cleaning, feature engineering, and ML modeling with rich metrics and insights",
+        "description": "Enhanced data analysis agent with structured outputs, intelligent intent parsing, and comprehensive ML pipeline orchestration from remote CSV files",
         "api_token": API_TOKEN,
         "mailbox": True
     }
@@ -298,37 +337,37 @@ if isinstance(agent_info, dict):
     agent_address = agent_info.get('agent_address', 'Unknown')
     agent_port = agent_info.get('agent_port', '8102')
 elif isinstance(agent_info, str):
-    # If it's a string, extract from logs
     agent_address = "Check logs above for actual address"
     agent_port = "8102"
 else:
     agent_address = "Unknown"
     agent_port = "8102"
 
-# Keep the agent alive (EXACT pattern from example)
+# Keep the agent alive
 if __name__ == "__main__":
     try:
-        print("\n🎉 DATA ANALYSIS UAGENT IS RUNNING!")
+        print("\n🎉 ENHANCED DATA ANALYSIS UAGENT IS RUNNING!")
         print("=" * 60)
         print(f"🔗 Agent address: {agent_address}")
         print(f"🌐 Port: {agent_port}")
         print(f"🎯 Inspector: https://agentverse.ai/inspect/?uri=http%3A//127.0.0.1%3A{agent_port}&address={agent_address}")
         print("\n📋 Usage:")
         print("Send a message with:")
-        print('- Simple string: "Clean and analyze the iris dataset"')
-        print('- Dict format: {"csv_url": "url", "user_request": "request", "target_variable": "optional"}')
-        print("\n🔗 Default CSV (if not specified): Titanic dataset")
-        print("\n🆕 Enhanced Features:")
-        print("- Structured output with comprehensive metrics")
-        print("- Advanced intent parsing and workflow orchestration")
-        print("- Rich insights and recommendations")
-        print("- Quality scoring and confidence assessment")
+        print('• Simple string: "Analyze the iris dataset for classification"')
+        print('• Structured dict: {')
+        print('    "csv_url": "https://your-url.com/data.csv",')
+        print('    "user_request": "Build a classification model",')
+        print('    "target_variable": "species",')
+        print('    "problem_type": "classification"')
+        print('  }')
+        print("\n🔗 Supported datasets: iris, titanic, wine, boston, diabetes, tips, flights")
+        print("🎯 Enhanced features: Structured outputs, intelligent parsing, comprehensive reports")
         print("\nPress Ctrl+C to stop...")
         
         while True:
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down data analysis agent...")
-        cleanup_uagent("data_analysis_enhanced")
+        print("\n🛑 Shutting down enhanced data analysis agent...")
+        cleanup_uagent("enhanced_data_analysis")
         print("✅ Agent stopped.") 
