@@ -435,19 +435,34 @@ def make_h2o_ml_agent(
                 H2O AutoML Documentation:
                     {h2o_automl_documentation}
 
-                Please recommend a short list of steps or considerations for performing H2OAutoML on this data. Specifically focus on maximizing model accuracy while remaining flexible to user instructions and the dataset.
+                Please recommend a short list of steps or considerations for performing H2OAutoML on this data. 
                 
-                - Recommend any paramters and values that might improve performance (predictive accuracy).
-                - Recommend the Loss Function, Stopping Criteria, and other advanced parameters.
-                - Use the H2O AutoML documentation to your advantage.
-                - Exclude deep learning algorithms since these are typically low performance.
+                IMPORTANT: Focus on EFFICIENCY and SPEED for small to medium datasets while maintaining reasonable accuracy.
+                
+                Dataset Size Guidelines:
+                - For datasets < 1,000 rows: Use minimal cross-validation (3-fold), limit models (max_models=10), shorter runtime
+                - For datasets < 10,000 rows: Use standard cross-validation (5-fold), moderate models (max_models=20)  
+                - For larger datasets: Use full parameters
+                
+                Optimization Focus:
+                - Recommend parameters that balance SPEED vs ACCURACY appropriately for the dataset size
+                - For small datasets, prioritize fast training over extensive hyperparameter search
+                - Suggest reasonable max_models limits based on dataset size
+                - Recommend appropriate nfolds based on dataset size
+                - Always exclude DeepLearning algorithms (they're slow and often underperform)
+                - Consider early stopping with reasonable tolerance for faster convergence
+                
+                Specific Recommendations:
+                - Recommend any parameters and values that improve performance while being efficient
+                - Suggest Loss Function, Stopping Criteria, and other parameters optimized for speed
+                - Use the H2O AutoML documentation but prioritize efficiency
                 
                 Avoid these:
-                
                 - Do not perform data cleaning or feature engineering here. We will handle that separately.
-                - Do not limit memory size or CPU usage unless the user specifies it. 
+                - Do not limit memory size or CPU usage unless the user specifies it.
+                - Do not suggest overly complex parameters for small datasets
                 
-                Return as a numbered list. You can return short code snippets to demonstrate actions. But do not return a fully coded solution. The H2O AutoML code will be generated separately by a Coding Agent.
+                Return as a numbered list with specific parameter recommendations. Focus on efficiency-optimized parameters.
             """,
             input_variables=["user_instructions", "all_datasets_summary", "h2o_automl_documentation"]
         )
@@ -467,7 +482,7 @@ def make_h2o_ml_agent(
         return {
             "recommended_steps": format_recommended_steps(
                 recommended_steps.content.strip(),
-                heading="# Recommended ML Steps:"
+                heading="# Recommended ML Steps (Optimized for Speed):"
             ),
             "all_datasets_summary": all_datasets_summary_str
         }

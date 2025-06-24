@@ -770,13 +770,18 @@ class DataAnalysisAgent:
             logger.info("Parsing workflow intent...")
             intent = self.intent_parser.parse_with_data_preview(text_input, csv_url)
             
-            # Step 3: Create request with detected parameters
+            # Step 3: Determine adaptive runtime based on dataset size
+            data_shape = self._get_data_shape(csv_url)
+            adaptive_runtime = self._calculate_adaptive_runtime(data_shape)
+            logger.info(f"Dataset shape: {data_shape}, Adaptive runtime: {adaptive_runtime}s")
+            
+            # Step 4: Create request with detected parameters and adaptive runtime
             request = DataAnalysisRequest(
                 csv_url=csv_url,
                 user_request=text_input,
                 target_variable=intent.suggested_target_variable,
                 problem_type=intent.suggested_problem_type,  # Use the intent parser's suggestion
-                max_runtime_seconds=300,  # Default 5 minutes
+                max_runtime_seconds=adaptive_runtime,  # Use adaptive runtime
                 enable_mlflow=True,
                 missing_threshold=0.4,
                 outlier_detection=True,
@@ -786,11 +791,11 @@ class DataAnalysisAgent:
                 categorical_encoding=True
             )
             
-            # Step 4: Execute the workflow based on intent flags
+            # Step 5: Execute the workflow based on intent flags
             logger.info(f"Executing workflow - Cleaning: {intent.needs_data_cleaning}, FE: {intent.needs_feature_engineering}, ML: {intent.needs_ml_modeling}")
             agent_results = self._execute_workflow_sync(request, intent)
             
-            # Step 5: Generate comprehensive result
+            # Step 6: Generate comprehensive result
             result = self._generate_result(request, intent, agent_results)
             
             # Add URL extraction information to warnings if confidence is low
@@ -803,13 +808,37 @@ class DataAnalysisAgent:
             logger.error(f"Text analysis failed: {e}")
             return self._create_error_result("", text_input, str(e))
     
-    # Remove the old problematic methods
-    def _extract_csv_url_from_text(self, text_input: str, intent: WorkflowIntent) -> Optional[str]:
-        """DEPRECATED: Use intent_parser.extract_dataset_url_from_text() instead"""
-        # This method is no longer used - URL extraction is now handled by LLM structured outputs
-        pass
+    def _calculate_adaptive_runtime(self, data_shape: Dict[str, int]) -> int:
+        """
+        Calculate adaptive runtime based on dataset size.
+        
+        Args:
+            data_shape: Dictionary with 'rows' and 'columns' keys
+            
+        Returns:
+            Adaptive runtime in seconds
+        """
+        try:
+            rows = data_shape.get('rows', 1000)  # Default fallback
+            cols = data_shape.get('columns', 10)  # Default fallback
+            
+            # Convert string values to int if needed
+            if isinstance(rows, str):
+                rows = int(rows) if rows.isdigit() else 1000
+            if isinstance(cols, str):
+                cols = int(cols) if cols.isdigit() else 10
+            
+            # Calculate adaptive runtime based on dataset size
+            if rows <= 500:  # Small datasets (like flights: 144 rows)
+                return 30  # 30 seconds for small datasets
+            elif rows <= 5000:  # Medium datasets
+                return 60  # 1 minute for medium datasets
+            elif rows <= 50000:  # Large datasets
+                return 120  # 2 minutes for large datasets
+            else:  # Very large datasets
+                return 300  # 5 minutes for very large datasets
+                
+        except Exception as e:
+            logger.warning(f"Failed to calculate adaptive runtime: {e}, using default 60s")
+            return 60  # Safe default
     
-    def _infer_problem_type(self, intent: WorkflowIntent) -> Optional[str]:
-        """DEPRECATED: Problem type is now suggested by the intent parser directly"""
-        # This method is no longer needed - the intent parser already suggests problem type
-        pass 

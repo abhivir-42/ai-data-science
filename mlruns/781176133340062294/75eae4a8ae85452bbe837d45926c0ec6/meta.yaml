@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/75eae4a8ae85452bbe837d45926c0ec6/artifacts
+end_time: 1750766759861
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: 75eae4a8ae85452bbe837d45926c0ec6
+run_name: omniscient-stork-628
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750766685702
+status: 3
+tags: []
+user_id: abhivir42

@@ -1,0 +1,14 @@
+artifact_uri: file:///Users/abhivir42/projects/fetch/ai-data-science/mlruns/781176133340062294/3b6ea7866f484ed4b434796f01dd58ac/artifacts
+end_time: 1750766667223
+entry_point_name: ''
+experiment_id: '781176133340062294'
+lifecycle_stage: active
+run_id: 3b6ea7866f484ed4b434796f01dd58ac
+run_name: peaceful-gnu-515
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1750766634058
+status: 4
+tags: []
+user_id: abhivir42
