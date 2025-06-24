@@ -13,6 +13,8 @@ from typing import Optional, Dict, Any, List
 from pathlib import Path
 import pandas as pd
 import traceback
+import os
+from datetime import datetime
 
 from src.schemas import (
     DataAnalysisRequest, 
@@ -224,7 +226,7 @@ class DataAnalysisAgent:
         if intent.needs_data_cleaning:
             result = await self._execute_data_cleaning_async(request, intent, current_data_path)
             results.append(result)
-            if result.success and result.output_data_path:
+            if result.output_data_path:
                 current_data_path = result.output_data_path
         
         # Execute feature engineering if needed
@@ -240,7 +242,7 @@ class DataAnalysisAgent:
                 request, intent, current_data_path, target_variable
             )
             results.append(result)
-            if result.success and result.output_data_path:
+            if result.output_data_path:
                 current_data_path = result.output_data_path
         
         # Execute ML modeling if needed
@@ -267,7 +269,7 @@ class DataAnalysisAgent:
         if intent.needs_data_cleaning:
             result = self._execute_data_cleaning_sync(request, intent, current_data_path)
             results.append(result)
-            if result.success and result.output_data_path:
+            if result.output_data_path:
                 current_data_path = result.output_data_path
         
         # Execute feature engineering if needed
@@ -283,7 +285,7 @@ class DataAnalysisAgent:
                 request, intent, current_data_path, target_variable
             )
             results.append(result)
-            if result.success and result.output_data_path:
+            if result.output_data_path:
                 current_data_path = result.output_data_path
         
         # Execute ML modeling if needed
@@ -335,8 +337,26 @@ class DataAnalysisAgent:
             )
             result_str = str(result_dict)
             
+            # Get the cleaned data and save it
+            cleaned_df = self.data_cleaning_agent.get_data_cleaned()
+            output_path = None
+            
+            if cleaned_df is not None:
+                # Generate unique output file path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_filename = f"cleaned_data_{timestamp}.csv"
+                output_path = str(self.output_dir / output_filename)
+                
+                # Ensure output directory exists
+                self.output_dir.mkdir(exist_ok=True)
+                
+                # Save cleaned data
+                cleaned_df.to_csv(output_path, index=False)
+                logger.info(f"Cleaned data saved to: {output_path}")
+            else:
+                logger.warning("No cleaned data was returned from the data cleaning agent")
+            
             # Parse result and create metrics
-            output_path = self._find_output_file(params["file_name"])
             data_quality_metrics = self._extract_cleaning_metrics(result_str, data_path, output_path)
             
             execution_time = time.time() - start_time
@@ -348,7 +368,7 @@ class DataAnalysisAgent:
                 data_quality_metrics=data_quality_metrics,
                 output_data_path=output_path,
                 log_messages=[result_str],
-                artifacts_paths={"log": params["log_path"]}
+                artifacts_paths={"log": params["log_path"], "cleaned_data": output_path} if output_path else {"log": params["log_path"]}
             )
             
         except Exception as e:
@@ -401,26 +421,74 @@ class DataAnalysisAgent:
             result_dict = self.feature_engineering_agent.invoke_agent(
                 data_raw=data_df,
                 user_instructions=params["user_instructions"],
-                target_variable=target_variable,
                 max_retries=3
             )
             result_str = str(result_dict)
             
-            # Parse result and create metrics
-            output_path = self._find_output_file(params["file_name"])
-            fe_metrics = self._extract_feature_engineering_metrics(result_str, data_path, output_path)
+            # Get the processed data and save it
+            processed_df = self.feature_engineering_agent.get_data_engineered()
+            output_path = None
             
-            execution_time = time.time() - start_time
-            
-            return AgentExecutionResult(
-                agent_name="feature_engineering",
-                execution_time_seconds=execution_time,
-                success=True,
-                feature_engineering_metrics=fe_metrics,
-                output_data_path=output_path,
-                log_messages=[result_str],
-                artifacts_paths={"log": params["log_path"]}
-            )
+            # Check if feature engineering actually succeeded
+            if processed_df is not None and not processed_df.empty:
+                # Generate unique output file path
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_filename = f"feature_engineered_data_{timestamp}.csv"
+                output_path = str(self.output_dir / output_filename)
+                
+                # Ensure output directory exists
+                self.output_dir.mkdir(exist_ok=True)
+                
+                # Save processed data
+                processed_df.to_csv(output_path, index=False)
+                logger.info(f"Feature engineered data saved to: {output_path}")
+                
+                # Parse result and create metrics
+                feature_engineering_metrics = self._extract_feature_engineering_metrics(result_str, data_path, output_path)
+                
+                execution_time = time.time() - start_time
+                
+                return AgentExecutionResult(
+                    agent_name="feature_engineering",
+                    execution_time_seconds=execution_time,
+                    success=True,
+                    feature_engineering_metrics=feature_engineering_metrics,
+                    output_data_path=output_path,
+                    log_messages=[result_str],
+                    artifacts_paths={"log": params["log_path"], "feature_engineered_data": output_path}
+                )
+            else:
+                # Feature engineering failed - processed_df is None or empty
+                logger.error("Feature engineering agent failed - no engineered data returned")
+                execution_time = time.time() - start_time
+                
+                # Extract error message from result if available
+                error_message = "Feature engineering failed after all retries"
+                if "feature_engineer_error" in result_str:
+                    # Try to extract the actual error
+                    import re
+                    # Try multiple patterns to extract error messages
+                    patterns = [
+                        r"'feature_engineer_error': '([^']*)'",
+                        r'"feature_engineer_error": "([^"]*)"',
+                        r"feature_engineer_error['\"]:\s*['\"]([^'\"]*)['\"]"
+                    ]
+                    
+                    for pattern in patterns:
+                        error_match = re.search(pattern, result_str)
+                        if error_match and error_match.group(1).strip():
+                            actual_error = error_match.group(1).strip()
+                            error_message = f"Feature engineering failed: {actual_error}"
+                            break
+                
+                return AgentExecutionResult(
+                    agent_name="feature_engineering",
+                    execution_time_seconds=execution_time,
+                    success=False,
+                    error_message=error_message,
+                    log_messages=[result_str],
+                    artifacts_paths={"log": params["log_path"]}
+                )
             
         except Exception as e:
             execution_time = time.time() - start_time
