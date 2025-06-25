@@ -37,6 +37,43 @@ from src.utils.regex import (
 from src.tools.dataframe import get_dataframe_summary
 from src.utils.logging import log_ai_function
 
+def fix_regex_escaping(code: str) -> str:
+    """
+    Fix common regex escaping issues in generated code.
+    
+    This function automatically converts problematic regex patterns
+    to use proper Python string escaping or raw strings.
+    """
+    try:
+        import re
+        
+        # Simple approach: look for string literals with backslash-dot and make them raw strings
+        # This will catch patterns like ' ([A-Za-z]+)\.' and convert to r' ([A-Za-z]+)\.'
+        
+        # Pattern to match string literals containing backslash followed by dot
+        pattern = r"'([^']*\\\..*?)'"
+        
+        def replace_with_raw(match):
+            content = match.group(1)
+            return f"r'{content}'"
+        
+        fixed_code = re.sub(pattern, replace_with_raw, code)
+        
+        # Also handle double quotes
+        pattern2 = r'"([^"]*\\\..*?)"'
+        def replace_with_raw2(match):
+            content = match.group(1)
+            return f'r"{content}"'
+        
+        fixed_code = re.sub(pattern2, replace_with_raw2, fixed_code)
+        
+        return fixed_code
+        
+    except Exception as e:
+        # If regex fixing fails, return original code
+        print(f"Warning: Could not fix regex escaping: {e}")
+        return code
+
 # Setup
 AGENT_NAME = "feature_engineering_agent"
 LOG_PATH = os.path.join(os.getcwd(), "logs/")
@@ -676,12 +713,21 @@ def make_feature_engineering_agent(
             - Use dtype=np.int32 instead of dtype=np.int
             - Always import what you need: from sklearn.preprocessing import OneHotEncoder
             
+            CRITICAL - Python String & Regex Syntax:
+            - Use raw strings for regex patterns: r'pattern' instead of 'pattern'
+            - For literal dots in regex, use r'\\.' or '\\\\.'
+            - Example: data['Title'] = data['Name'].str.extract(r' ([A-Za-z]+)\\.', expand=False)
+            - Avoid unescaped backslashes in string literals
+            - Use f-strings or .format() for string formatting, not % formatting
+            
             Avoid the following errors:
             
             - name 'OneHotEncoder' is not defined
             - OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
             - 'OneHotEncoder' object has no attribute 'get_feature_names'
             - argument of type 'method' is not iterable
+            - invalid escape sequence '\\.' (use raw strings: r'pattern')
+            - DeprecationWarning: invalid escape sequence (use r'' strings for regex)
             - Shape of passed values is (7043, 48), indices imply (7043, 47)
             - name 'numeric_features' is not defined
             - name 'categorical_features' is not defined
@@ -701,6 +747,7 @@ def make_feature_engineering_agent(
         })
         
         response = relocate_imports_inside_function(response)
+        response = fix_regex_escaping(response)
         response = add_comments_to_top(response, agent_name=AGENT_NAME)
 
         # For logging: store the code generated
@@ -746,6 +793,12 @@ def make_feature_engineering_agent(
         - Use encoder.get_feature_names_out() instead of encoder.get_feature_names()
         - Use dtype=np.int32 instead of dtype=np.int
         - Always import what you need: from sklearn.preprocessing import OneHotEncoder
+        
+        CRITICAL - Python String & Regex Syntax:
+        - Use raw strings for regex patterns: r'pattern' instead of 'pattern'
+        - For literal dots in regex, use r'\\.' or '\\\\.'
+        - Example: data['Title'] = data['Name'].str.extract(r' ([A-Za-z]+)\\.', expand=False)
+        - Avoid unescaped backslashes in string literals
         
         This is the broken code (please fix): 
         {code_snippet}
