@@ -4,13 +4,31 @@
 
 Think of our Data Analysis Agent as a **really smart project manager** for data science work. You give it messy instructions like "clean this dataset and build a model," and it figures out exactly what to do, breaks it into steps, talks to the right specialists (cleaning agent, feature engineering agent, ML agent), and gives you back a detailed report of everything that happened. 
 
-The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to make sure nothing gets lost in translation, and everything is validated and tracked from start to finish.
+**Why We Use Structured Outputs & Schemas:**
+We built **5 main schemas** using Pydantic that act like digital contracts:
+1. **`DataAnalysisRequest`** - The input form with 20+ validated fields (URLs, thresholds, preferences)  
+2. **`WorkflowIntent`** - What the AI understood from your request (confidence scores, workflow flags)
+3. **`AgentExecutionResult`** - Detailed results from each specialist agent
+4. **`DataAnalysisResult`** - The final comprehensive report with metrics and insights
+5. **`DatasetExtractionRequest`** - URL extraction results with confidence scores
+
+Instead of hoping agents understand each other, we force them to communicate through these validated forms. No more "oops, I passed a string but you expected a number" - everything gets checked before it runs.
+
+**The Actual Flow:**
+1. **Text Input** → Extract dataset URL using LLM structured outputs
+2. **Dataset Preview** → Download sample to understand the data structure  
+3. **Intent Parsing** → AI analyzes request and fills out `WorkflowIntent` schema
+4. **Request Creation** → Build validated `DataAnalysisRequest` with adaptive settings
+5. **Parameter Mapping** → Translate user preferences to agent-specific parameters
+6. **Workflow Execution** → Run agents in sequence (cleaning → features → ML)
+7. **Result Generation** → Package everything into structured `DataAnalysisResult`
 
 ---
 
 ## What to Show During Your Demo
 
 ### 1. **The Magic Input Form** (Show: `src/schemas/data_analysis_schemas.py`)
+*This is Step 4 in our flow - creating a validated `DataAnalysisRequest` with 20+ fields that have built-in validation rules*
 
 **Show:** Lines 29-87 (`DataAnalysisRequest` class)
 **Say:** 
@@ -22,6 +40,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 58: `missing_threshold: Optional[float] = Field(default=0.4, ge=0.0, le=1.0)` - "No invalid numbers allowed!"
 
 ### 2. **The AI Mind Reader** (Show: `src/parsers/intent_parser.py`)
+*This is Step 3 - using LLM structured outputs with `PydanticOutputParser` to force AI responses into our `WorkflowIntent` schema*
 
 **Show:** Lines 82-86 (`_create_prompt_template` method)
 **Say:**
@@ -32,6 +51,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 61: `self.chain = self.prompt_template | self.llm | self.output_parser` - "Chain it all together like a pipeline"
 
 ### 3. **The AI's Game Plan** (Show: `src/schemas/data_analysis_schemas.py`)
+*This shows the `WorkflowIntent` schema structure - 8 boolean workflow flags plus AI-suggested parameters and confidence scores*
 
 **Show:** Lines 125-183 (`WorkflowIntent` class)
 **Say:**
@@ -43,6 +63,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 176: `intent_confidence: float = Field(ge=0.0, le=1.0)` - "How sure is the AI? Scale of 0 to 1"
 
 ### 4. **The Smart Translator** (Show: `src/mappers/parameter_mapper.py`)
+*This is Step 5 - the `AgentParameterMapper` class converts our standardized schemas into agent-specific parameter formats*
 
 **Show:** Lines 42-85 (`map_data_cleaning_parameters` method)
 **Say:**
@@ -53,6 +74,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 161: `params = self.parameter_mapper.map_data_cleaning_parameters(request, intent, data_path)` - "Translation in action"
 
 ### 5. **The Smart Project Manager** (Show: `src/agents/data_analysis_agent.py`)
+*This is Step 6 - the `_execute_workflow_sync` method that runs agents conditionally based on `WorkflowIntent` flags and chains outputs together*
 
 **Show:** Lines 248-285 (`_execute_workflow_sync` method)
 **Say:**
@@ -64,6 +86,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 267: `intent.suggested_target_variable or request.target_variable` - "Use AI suggestions or user input"
 
 ### 6. **The Detailed Report Card** (Show: `src/agents/data_analysis_agent.py`)
+*This is Step 7 - the `_generate_result` method packages everything into a comprehensive `DataAnalysisResult` schema with 15+ fields*
 
 **Show:** Lines 576-638 (`_generate_result` method)
 **Say:**
@@ -75,6 +98,7 @@ The cool part? It uses **structured schemas** (like fill-in-the-blank forms) to 
 - Line 625: `agent_results=agent_results` - "Here's exactly what each agent did"
 
 ### 7. **The Magic One-Liner** (Show: `src/agents/data_analysis_agent.py`)
+*This is the complete end-to-end `analyze_from_text` method that orchestrates all 7 steps using structured schemas throughout*
 
 **Show:** Lines 812-883 (`analyze_from_text` method)
 **Say:**
