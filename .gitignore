@@ -61,6 +61,7 @@ debug_logs/
 
 # Output directories and generated files
 output/
+outputs/
 models/
 demo/output/
 demo/h2o_models/

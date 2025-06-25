@@ -729,7 +729,7 @@ print("🚀 Registering enhanced data analysis uAgent...")
 agent_info = tool.invoke(
     {
         "agent_obj": data_analysis_agent_func,  # Pass the function
-        "name": "enhanced_data_analysis",
+        "name": "Data Engineering Agent",
         "port": 8102,
         "description": "Enhanced data analysis agent with LLM-powered CSV URL extraction, intelligent workflow orchestration, and comprehensive ML pipeline automation",
         "api_token": API_TOKEN,
@@ -777,5 +777,5 @@ if __name__ == "__main__":
             
     except KeyboardInterrupt:
         print("\n🛑 Shutting down enhanced data analysis agent...")
-        cleanup_uagent("enhanced_data_analysis")
+        cleanup_uagent("Data Engineering Agent")
         print("✅ Agent stopped.") 
