@@ -14,6 +14,7 @@ import time
 import sys
 import re
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 # Add src to path
@@ -45,6 +46,209 @@ data_analysis_agent = DataAnalysisAgent(
 # Global variable to store the last processed data for follow-up requests
 _last_cleaned_data = None
 _last_processed_timestamp = None
+
+def upload_csv_to_remote_host(file_path, file_description="Processed Data"):
+    """
+    Upload CSV file to a remote hosting service and return public URL.
+    
+    Parameters
+    ----------
+    file_path : str
+        Local path to the CSV file
+    file_description : str
+        Description of the file for naming
+        
+    Returns
+    -------
+    dict
+        Dictionary containing success status, URL, and metadata
+    """
+    try:
+        if not os.path.exists(file_path):
+            return {
+                "success": False,
+                "error": f"File not found: {file_path}",
+                "url": None
+            }
+        
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        file_size_mb = file_size / (1024 * 1024)
+        
+        # Check if file is too large (most free services have limits)
+        if file_size_mb > 50:  # 50MB limit
+            return {
+                "success": False,
+                "error": f"File too large ({file_size_mb:.1f} MB). Maximum size is 50MB.",
+                "url": None
+            }
+        
+        # Try multiple hosting services for reliability
+        hosting_services = [
+            {
+                "name": "anonymousfiles.io",
+                "url": "https://api.anonymousfiles.io/",
+                "method": "POST"
+            },
+            {
+                "name": "file.io",
+                "url": "https://file.io/",
+                "method": "POST"
+            }
+        ]
+        
+        for service in hosting_services:
+            try:
+                print(f"🔄 Uploading to {service['name']}...")
+                
+                with open(file_path, 'rb') as file:
+                    if service['name'] == "anonymousfiles.io":
+                        response = requests.post(
+                            service['url'],
+                            files={'file': file},
+                            timeout=30
+                        )
+                    elif service['name'] == "file.io":
+                        response = requests.post(
+                            service['url'],
+                            files={'file': file},
+                            timeout=30
+                        )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        
+                        # Extract URL based on service
+                        if service['name'] == "anonymousfiles.io" and 'url' in result:
+                            return {
+                                "success": True,
+                                "url": result['url'],
+                                "service": service['name'],
+                                "file_id": result.get('id', 'unknown'),
+                                "size_mb": file_size_mb,
+                                "error": None
+                            }
+                        elif service['name'] == "file.io" and 'link' in result:
+                            return {
+                                "success": True,
+                                "url": result['link'],
+                                "service": service['name'],
+                                "file_id": result.get('key', 'unknown'),
+                                "size_mb": file_size_mb,
+                                "error": None
+                            }
+                
+            except Exception as e:
+                print(f"❌ Failed to upload to {service['name']}: {str(e)}")
+                continue
+        
+        # If all services failed
+        return {
+            "success": False,
+            "error": "All hosting services failed. File saved locally only.",
+            "url": None
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Upload error: {str(e)}",
+            "url": None
+        }
+
+def create_shareable_csv_link(file_path, file_name, file_description="Processed Data"):
+    """
+    Create a shareable link for a CSV file by uploading it to a remote host.
+    
+    Parameters
+    ----------
+    file_path : str
+        Local path to the CSV file
+    file_name : str
+        Name of the file for display
+    file_description : str
+        Description of the file
+        
+    Returns
+    -------
+    list
+        List of formatted strings for display
+    """
+    lines = []
+    
+    try:
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        file_size_kb = file_size / 1024
+        file_size_mb = file_size / (1024 * 1024)
+        
+        # Read CSV to get basic stats
+        df = pd.read_csv(file_path)
+        
+        lines.extend([
+            f"🔗 **{file_name.replace('_', ' ').title()}** (CSV File - {file_size_kb:.1f} KB):",
+            f"   📊 Dataset: {len(df):,} rows × {len(df.columns)} columns",
+            f"   📅 Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+            ""
+        ])
+        
+        # Upload to remote host
+        upload_result = upload_csv_to_remote_host(file_path, file_description)
+        
+        if upload_result["success"]:
+            lines.extend([
+                "🌐 **SHAREABLE LINK CREATED**:",
+                f"   🔗 **Download URL**: {upload_result['url']}",
+                f"   🏢 **Service**: {upload_result['service']}",
+                f"   📦 **File ID**: {upload_result['file_id']}",
+                f"   📊 **Size**: {upload_result['size_mb']:.2f} MB",
+                "",
+                "💡 **How to use**:",
+                "   1. Click the URL above to download your processed data",
+                "   2. Save the file with a .csv extension",
+                "   3. Open in Excel, Python, R, or any data analysis tool",
+                "   4. Share the link with colleagues or save for later use",
+                "",
+                "⚠️  **Note**: This is a temporary link. Download and save your data promptly."
+            ])
+        else:
+            # Fallback: Provide local file info and sample data
+            lines.extend([
+                "❌ **REMOTE HOSTING FAILED**:",
+                f"   Error: {upload_result['error']}",
+                "",
+                "📋 **FALLBACK: CSV DATA PREVIEW**:",
+                ""
+            ])
+            
+            # Show preview of the data
+            if file_size_kb < 100:  # Small file - show more data
+                lines.extend([
+                    f"📊 **Complete CSV Data** ({len(df):,} rows × {len(df.columns)} columns):",
+                    "```csv",
+                    df.to_csv(index=False),
+                    "```",
+                    "",
+                    "💡 **Usage**: Copy the CSV content above and save as .csv file"
+                ])
+            else:  # Large file - show preview
+                lines.extend([
+                    f"📊 **CSV Preview** (First 10 of {len(df):,} rows × {len(df.columns)} columns):",
+                    "```csv",
+                    df.head(10).to_csv(index=False),
+                    "```",
+                    "",
+                    f"📁 **Local file**: {file_path}",
+                    "💡 **To get complete data**: Ask 'Send my cleaned data in chunks'"
+                ])
+        
+    except Exception as e:
+        lines.extend([
+            f"❌ **Error processing file**: {str(e)}",
+            f"📁 **Local file location**: {file_path}"
+        ])
+    
+    return lines
 
 def data_analysis_agent_func(query):
     """
@@ -309,81 +513,8 @@ def display_file_contents(file_name, file_path):
         file_ext = os.path.splitext(file_path)[1].lower()
         
         if file_ext == '.csv':
-            # Handle CSV files
-            file_lines.extend([
-                f"📊 **{file_name.replace('_', ' ').title()}** (CSV File - {file_size_kb:.1f} KB):",
-                ""
-            ])
-            
-            if file_size_kb < 50:  # Small CSV - show full content
-                try:
-                    df = pd.read_csv(file_path)
-                    csv_content = df.to_csv(index=False)
-                    file_lines.extend([
-                        f"📋 **Complete CSV Data** ({len(df):,} rows × {len(df.columns)} columns):",
-                        "```csv",
-                        csv_content,
-                        "```",
-                        "",
-                        "💡 **Usage**: Copy the CSV content above and save as .csv file"
-                    ])
-                except Exception as e:
-                    # Fallback to raw text reading
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    file_lines.extend([
-                        "```csv",
-                        content,
-                        "```"
-                    ])
-            
-            elif file_size_kb < 200:  # Medium CSV - show preview
-                try:
-                    df = pd.read_csv(file_path)
-                    preview_df = df.head(10)
-                    file_lines.extend([
-                        f"📋 **CSV Preview** (First 10 of {len(df):,} rows × {len(df.columns)} columns):",
-                        "```csv",
-                        preview_df.to_csv(index=False),
-                        "```",
-                        "",
-                        f"💡 **Full dataset**: {len(df):,} rows × {len(df.columns)} columns",
-                        f"   **File location**: {file_path}",
-                        "   **To get complete data**: Ask 'Provide my complete cleaned data'"
-                    ])
-                except Exception as e:
-                    file_lines.extend([
-                        f"⚠️ Could not read CSV: {str(e)}",
-                        f"📁 File location: {file_path}"
-                    ])
-            
-            else:  # Large CSV - show summary only
-                try:
-                    df = pd.read_csv(file_path)
-                    sample_df = df.head(5)
-                    file_lines.extend([
-                        f"📋 **Large CSV Summary** ({len(df):,} rows × {len(df.columns)} columns - {file_size_kb:.1f} KB):",
-                        "",
-                        "🔍 **First 5 rows sample**:",
-                        "```csv",
-                        sample_df.to_csv(index=False),
-                        "```",
-                        "",
-                        f"📊 **Dataset Info**:",
-                        f"   • Total rows: {len(df):,}",
-                        f"   • Total columns: {len(df.columns)}",
-                        f"   • File size: {file_size_kb:.1f} KB",
-                        f"   • Missing values: {df.isnull().sum().sum():,}",
-                        "",
-                        "💡 **To access complete data**:",
-                        "   Ask: 'Send my cleaned data in chunks' or 'Provide my complete dataset'"
-                    ])
-                except Exception as e:
-                    file_lines.extend([
-                        f"📊 **Large CSV File** ({file_size_kb:.1f} KB)",
-                        f"⚠️ Could not read CSV: {str(e)}",
-                        f"📁 File location: {file_path}"
-                    ])
+            # Handle CSV files with remote hosting
+            file_lines.extend(create_shareable_csv_link(file_path, file_name, "Processed CSV Data"))
         
         elif file_ext == '.txt' or file_ext == '.log':
             # Handle text/log files
@@ -645,7 +776,7 @@ def format_analysis_result(result) -> str:
         
         if cleaning_actions:
             lines.extend([
-                "�� **CLEANING ACTIONS PERFORMED**:",
+                "🧹 **CLEANING ACTIONS PERFORMED**:",
                 *[f"   • {action}" for action in cleaning_actions[:10]],  # Limit to 10 actions
                 f"   • ...and {len(cleaning_actions) - 10} more actions" if len(cleaning_actions) > 10 else "",
                 ""
