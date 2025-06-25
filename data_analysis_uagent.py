@@ -86,13 +86,8 @@ def upload_csv_to_remote_host(file_path, file_description="Processed Data"):
         # Try multiple hosting services for reliability
         hosting_services = [
             {
-                "name": "anonymousfiles.io",
-                "url": "https://api.anonymousfiles.io/",
-                "method": "POST"
-            },
-            {
-                "name": "file.io",
-                "url": "https://file.io/",
+                "name": "tmpfiles.org",
+                "url": "https://tmpfiles.org/api/v1/upload",
                 "method": "POST"
             }
         ]
@@ -102,13 +97,7 @@ def upload_csv_to_remote_host(file_path, file_description="Processed Data"):
                 print(f"🔄 Uploading to {service['name']}...")
                 
                 with open(file_path, 'rb') as file:
-                    if service['name'] == "anonymousfiles.io":
-                        response = requests.post(
-                            service['url'],
-                            files={'file': file},
-                            timeout=30
-                        )
-                    elif service['name'] == "file.io":
+                    if service['name'] == "tmpfiles.org":
                         response = requests.post(
                             service['url'],
                             files={'file': file},
@@ -119,23 +108,20 @@ def upload_csv_to_remote_host(file_path, file_description="Processed Data"):
                         result = response.json()
                         
                         # Extract URL based on service
-                        if service['name'] == "anonymousfiles.io" and 'url' in result:
+                        if service['name'] == "tmpfiles.org" and result.get('status') == 'success':
+                            file_url = result['data']['url']
+                            # Convert http to https for better security
+                            if file_url.startswith('http://'):
+                                file_url = file_url.replace('http://', 'https://')
+                            
                             return {
                                 "success": True,
-                                "url": result['url'],
+                                "url": file_url,
                                 "service": service['name'],
-                                "file_id": result.get('id', 'unknown'),
+                                "file_id": file_url.split('/')[-2] if '/' in file_url else 'unknown',
                                 "size_mb": file_size_mb,
-                                "error": None
-                            }
-                        elif service['name'] == "file.io" and 'link' in result:
-                            return {
-                                "success": True,
-                                "url": result['link'],
-                                "service": service['name'],
-                                "file_id": result.get('key', 'unknown'),
-                                "size_mb": file_size_mb,
-                                "error": None
+                                "error": None,
+                                "expires": "60 minutes (auto-delete)"
                             }
                 
             except Exception as e:
@@ -202,6 +188,7 @@ def create_shareable_csv_link(file_path, file_name, file_description="Processed 
                 f"   🏢 **Service**: {upload_result['service']}",
                 f"   📦 **File ID**: {upload_result['file_id']}",
                 f"   📊 **Size**: {upload_result['size_mb']:.2f} MB",
+                f"   ⏰ **Expires**: {upload_result['expires']}",
                 "",
                 "💡 **How to use**:",
                 "   1. Click the URL above to download your processed data",
@@ -209,7 +196,7 @@ def create_shareable_csv_link(file_path, file_name, file_description="Processed 
                 "   3. Open in Excel, Python, R, or any data analysis tool",
                 "   4. Share the link with colleagues or save for later use",
                 "",
-                "⚠️  **Note**: This is a temporary link. Download and save your data promptly."
+                "⚠️  **Important**: File auto-deletes after 60 minutes. Download promptly!"
             ])
         else:
             # Fallback: Provide local file info and sample data

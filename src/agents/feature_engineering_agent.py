@@ -670,14 +670,20 @@ def make_feature_engineering_agent(
             - Avoid creating highly correlated features unless explicitly instructed.
             - Convert Boolean to integer values (0/1) after one-hot encoding unless otherwise instructed.
             
+            IMPORTANT - Use Modern Sklearn Syntax (v1.6+):
+            - Use OneHotEncoder(sparse_output=False) instead of OneHotEncoder(sparse=False)
+            - Use encoder.get_feature_names_out() instead of encoder.get_feature_names()
+            - Use dtype=np.int32 instead of dtype=np.int
+            - Always import what you need: from sklearn.preprocessing import OneHotEncoder
+            
             Avoid the following errors:
             
             - name 'OneHotEncoder' is not defined
-            
+            - OneHotEncoder.__init__() got an unexpected keyword argument 'sparse'
+            - 'OneHotEncoder' object has no attribute 'get_feature_names'
+            - argument of type 'method' is not iterable
             - Shape of passed values is (7043, 48), indices imply (7043, 47)
-            
             - name 'numeric_features' is not defined
-            
             - name 'categorical_features' is not defined
 
 
@@ -734,6 +740,12 @@ def make_feature_engineering_agent(
         Provide only the corrected function definition for {function_name}().
         
         Return Python code in ```python``` format with a single function definition, {function_name}(data_raw), that includes all imports inside the function.
+        
+        IMPORTANT - Use Modern Sklearn Syntax (v1.6+):
+        - Use OneHotEncoder(sparse_output=False) instead of OneHotEncoder(sparse=False)
+        - Use encoder.get_feature_names_out() instead of encoder.get_feature_names()
+        - Use dtype=np.int32 instead of dtype=np.int
+        - Always import what you need: from sklearn.preprocessing import OneHotEncoder
         
         This is the broken code (please fix): 
         {code_snippet}
