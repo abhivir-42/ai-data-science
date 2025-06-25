@@ -288,6 +288,210 @@ Showing columns: {', '.join(selected_cols)}
 Total dataset has {len(df.columns)} columns: {', '.join(df.columns.tolist())}
 """
 
+def display_file_contents(file_name, file_path):
+    """Display the contents of a generated file based on its type."""
+    file_lines = []
+    
+    try:
+        if not os.path.exists(file_path):
+            file_lines.extend([
+                f"📄 **{file_name.replace('_', ' ').title()}**:",
+                f"   ⚠️ File not found: {file_path}",
+                ""
+            ])
+            return file_lines
+        
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        file_size_kb = file_size / 1024
+        
+        # Determine file type and display strategy
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        if file_ext == '.csv':
+            # Handle CSV files
+            file_lines.extend([
+                f"📊 **{file_name.replace('_', ' ').title()}** (CSV File - {file_size_kb:.1f} KB):",
+                ""
+            ])
+            
+            if file_size_kb < 50:  # Small CSV - show full content
+                try:
+                    df = pd.read_csv(file_path)
+                    csv_content = df.to_csv(index=False)
+                    file_lines.extend([
+                        f"📋 **Complete CSV Data** ({len(df):,} rows × {len(df.columns)} columns):",
+                        "```csv",
+                        csv_content,
+                        "```",
+                        "",
+                        "💡 **Usage**: Copy the CSV content above and save as .csv file"
+                    ])
+                except Exception as e:
+                    # Fallback to raw text reading
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    file_lines.extend([
+                        "```csv",
+                        content,
+                        "```"
+                    ])
+            
+            elif file_size_kb < 200:  # Medium CSV - show preview
+                try:
+                    df = pd.read_csv(file_path)
+                    preview_df = df.head(10)
+                    file_lines.extend([
+                        f"📋 **CSV Preview** (First 10 of {len(df):,} rows × {len(df.columns)} columns):",
+                        "```csv",
+                        preview_df.to_csv(index=False),
+                        "```",
+                        "",
+                        f"💡 **Full dataset**: {len(df):,} rows × {len(df.columns)} columns",
+                        f"   **File location**: {file_path}",
+                        "   **To get complete data**: Ask 'Provide my complete cleaned data'"
+                    ])
+                except Exception as e:
+                    file_lines.extend([
+                        f"⚠️ Could not read CSV: {str(e)}",
+                        f"📁 File location: {file_path}"
+                    ])
+            
+            else:  # Large CSV - show summary only
+                try:
+                    df = pd.read_csv(file_path)
+                    sample_df = df.head(5)
+                    file_lines.extend([
+                        f"📋 **Large CSV Summary** ({len(df):,} rows × {len(df.columns)} columns - {file_size_kb:.1f} KB):",
+                        "",
+                        "🔍 **First 5 rows sample**:",
+                        "```csv",
+                        sample_df.to_csv(index=False),
+                        "```",
+                        "",
+                        f"📊 **Dataset Info**:",
+                        f"   • Total rows: {len(df):,}",
+                        f"   • Total columns: {len(df.columns)}",
+                        f"   • File size: {file_size_kb:.1f} KB",
+                        f"   • Missing values: {df.isnull().sum().sum():,}",
+                        "",
+                        "💡 **To access complete data**:",
+                        "   Ask: 'Send my cleaned data in chunks' or 'Provide my complete dataset'"
+                    ])
+                except Exception as e:
+                    file_lines.extend([
+                        f"📊 **Large CSV File** ({file_size_kb:.1f} KB)",
+                        f"⚠️ Could not read CSV: {str(e)}",
+                        f"📁 File location: {file_path}"
+                    ])
+        
+        elif file_ext == '.txt' or file_ext == '.log':
+            # Handle text/log files
+            file_lines.extend([
+                f"📝 **{file_name.replace('_', ' ').title()}** (Text File - {file_size_kb:.1f} KB):",
+                ""
+            ])
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                if len(content) < 10000:  # Small text file - show full content
+                    file_lines.extend([
+                        "```",
+                        content,
+                        "```"
+                    ])
+                else:  # Large text file - show first part
+                    preview_content = content[:5000] + "\n\n... (truncated for display) ..."
+                    file_lines.extend([
+                        f"📄 **Content Preview** (First 5000 characters of {len(content):,} total):",
+                        "```",
+                        preview_content,
+                        "```",
+                        "",
+                        f"📁 **Full file location**: {file_path}"
+                    ])
+            
+            except Exception as e:
+                file_lines.extend([
+                    f"⚠️ Could not read text file: {str(e)}",
+                    f"📁 File location: {file_path}"
+                ])
+        
+        elif file_ext in ['.py', '.r', '.sql']:
+            # Handle code files
+            file_lines.extend([
+                f"💻 **{file_name.replace('_', ' ').title()}** (Code File - {file_size_kb:.1f} KB):",
+                ""
+            ])
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Determine language for syntax highlighting
+                lang_map = {'.py': 'python', '.r': 'r', '.sql': 'sql'}
+                lang = lang_map.get(file_ext, 'text')
+                
+                if len(content) < 8000:  # Show full code file
+                    file_lines.extend([
+                        f"```{lang}",
+                        content,
+                        "```"
+                    ])
+                else:  # Show preview of large code file
+                    preview_content = content[:4000] + "\n\n# ... (truncated for display) ..."
+                    file_lines.extend([
+                        f"📄 **Code Preview** (First 4000 characters):",
+                        f"```{lang}",
+                        preview_content,
+                        "```",
+                        "",
+                        f"📁 **Full file location**: {file_path}"
+                    ])
+            
+            except Exception as e:
+                file_lines.extend([
+                    f"⚠️ Could not read code file: {str(e)}",
+                    f"📁 File location: {file_path}"
+                ])
+        
+        else:
+            # Handle other file types
+            file_lines.extend([
+                f"📄 **{file_name.replace('_', ' ').title()}** ({file_ext.upper()} File - {file_size_kb:.1f} KB):",
+                f"📁 File location: {file_path}",
+                ""
+            ])
+            
+            # Try to read as text if it's small
+            if file_size_kb < 20:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    file_lines.extend([
+                        "📄 **File Contents**:",
+                        "```",
+                        content,
+                        "```"
+                    ])
+                except:
+                    file_lines.append("⚠️ Binary file - cannot display content as text")
+            else:
+                file_lines.append("📁 File too large to display - check file location above")
+    
+    except Exception as e:
+        file_lines.extend([
+            f"📄 **{file_name.replace('_', ' ').title()}**:",
+            f"   ❌ Error reading file: {str(e)}",
+            f"   📁 File path: {file_path}",
+            ""
+        ])
+    
+    return file_lines
+
+
 def format_analysis_result(result) -> str:
     """Format the analysis result into a comprehensive, user-friendly response."""
     
@@ -680,13 +884,16 @@ def format_analysis_result(result) -> str:
                 ""
             ])
         
-        # Generated files
+        # Generated files with actual content
         if result.generated_files:
             lines.extend([
-                "📁 **GENERATED FILES**:",
-                *[f"   • {name}: {path}" for name, path in result.generated_files.items()],
+                "📁 **GENERATED FILES & CONTENTS**:",
                 ""
             ])
+            
+            for name, path in result.generated_files.items():
+                lines.extend(display_file_contents(name, path))
+                lines.append("")  # Add spacing between files
         
         # Warnings
         if result.warnings:
