@@ -421,6 +421,7 @@ class DataAnalysisAgent:
             result_dict = self.feature_engineering_agent.invoke_agent(
                 data_raw=data_df,
                 user_instructions=params["user_instructions"],
+                target_variable=target_variable,
                 max_retries=3
             )
             result_str = str(result_dict)

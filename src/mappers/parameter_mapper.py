@@ -278,7 +278,10 @@ class AgentParameterMapper:
         # Add target variable information
         if target_variable:
             instructions.append(f"- Target variable: {target_variable}")
-            instructions.append(f"- Problem type: {request.problem_type.value}")
+            if request.problem_type:
+                instructions.append(f"- Problem type: {request.problem_type.value}")
+            else:
+                instructions.append("- Problem type: auto")
         
         # Add specific feature engineering requirements
         if request.categorical_encoding:
@@ -342,8 +345,11 @@ class AgentParameterMapper:
         ]
         
         # Add model type preferences
-        model_names = [model.value for model in request.model_types]
-        instructions.append(f"- Model types to try: {', '.join(model_names)}")
+        if request.model_types:
+            model_names = [model.value for model in request.model_types]
+            instructions.append(f"- Model types to try: {', '.join(model_names)}")
+        else:
+            instructions.append("- Model types to try: GBM, RandomForest, GLM")
         
         # Add cross-validation requirements
         instructions.append(f"- Use {request.cross_validation_folds}-fold cross-validation")
@@ -402,7 +408,7 @@ class AgentParameterMapper:
             ModelType.AUTO_ML: "AutoML"
         }
         
-        return [model_mapping.get(model_type, model_type.value) for model_type in model_types]
+        return [model_mapping.get(model_type, model_type.value) for model_type in model_types if model_type]
     
     def _determine_problem_type(
         self,
