@@ -47,25 +47,48 @@ def fix_regex_escaping(code: str) -> str:
     try:
         import re
         
-        # Simple approach: look for string literals with backslash-dot and make them raw strings
-        # This will catch patterns like ' ([A-Za-z]+)\.' and convert to r' ([A-Za-z]+)\.'
+        # Fix the most common regex escaping issues:
+        # 1. Fix string literals with backslash-dot patterns
+        # 2. Fix double backslash patterns that got corrupted
+        # 3. Fix common regex patterns in pandas str.extract()
         
-        # Pattern to match string literals containing backslash followed by dot
-        pattern = r"'([^']*\\\..*?)'"
-        
-        def replace_with_raw(match):
+        # Pattern 1: Fix basic regex patterns with backslash-dot
+        pattern1 = r"'([^']*\\\.[^']*?)'"
+        def replace_with_raw1(match):
             content = match.group(1)
             return f"r'{content}'"
         
-        fixed_code = re.sub(pattern, replace_with_raw, code)
+        fixed_code = re.sub(pattern1, replace_with_raw1, code)
         
-        # Also handle double quotes
-        pattern2 = r'"([^"]*\\\..*?)"'
+        # Pattern 2: Handle double quotes too
+        pattern2 = r'"([^"]*\\\.[^"]*?)"'
         def replace_with_raw2(match):
             content = match.group(1)
             return f'r"{content}"'
         
         fixed_code = re.sub(pattern2, replace_with_raw2, fixed_code)
+        
+        # Pattern 3: Specific fix for corrupted raw string prefixes like "rr'"
+        # This handles cases where the LLM generates "rr'" instead of "r'"
+        fixed_code = re.sub(r'\brr\'([^\']*?)\'', r"r'\1'", fixed_code)
+        fixed_code = re.sub(r'\brr"([^"]*?)"', r'r"\1"', fixed_code)
+        
+        # Pattern 4: Fix common pandas regex patterns specifically
+        # Look for .str.extract( followed by non-raw string with backslash patterns
+        extract_pattern = r'\.str\.extract\(\s*\'([^\']*\\[^\']*?)\''
+        def fix_extract(match):
+            content = match.group(1)
+            return f".str.extract(r'{content}'"
+        
+        fixed_code = re.sub(extract_pattern, fix_extract, fixed_code)
+        
+        # Pattern 5: Same for double quotes in extract
+        extract_pattern2 = r'\.str\.extract\(\s*"([^"]*\\[^"]*?)"'
+        def fix_extract2(match):
+            content = match.group(1)
+            return f'.str.extract(r"{content}"'
+        
+        fixed_code = re.sub(extract_pattern2, fix_extract2, fixed_code)
         
         return fixed_code
         
@@ -799,6 +822,7 @@ def make_feature_engineering_agent(
         - For literal dots in regex, use r'\\.' or '\\\\.'
         - Example: data['Title'] = data['Name'].str.extract(r' ([A-Za-z]+)\\.', expand=False)
         - Avoid unescaped backslashes in string literals
+        - Never use prefixes like "rr'" - use only "r'" for raw strings
         
         This is the broken code (please fix): 
         {code_snippet}
@@ -807,7 +831,8 @@ def make_feature_engineering_agent(
         {error}
         """
 
-        return node_func_fix_agent_code(
+        # Call the standard fix function but also apply regex escaping
+        result = node_func_fix_agent_code(
             state=state,
             code_snippet_key="feature_engineer_function",
             error_key="feature_engineer_error",
@@ -818,6 +843,12 @@ def make_feature_engineering_agent(
             file_path=state.get("feature_engineer_function_path"),
             function_name=state.get("feature_engineer_function_name"),
         )
+        
+        # Apply regex escaping fix to the corrected code
+        if "feature_engineer_function" in result:
+            result["feature_engineer_function"] = fix_regex_escaping(result["feature_engineer_function"])
+        
+        return result
 
     # Final reporting node
     def report_agent_outputs(state: GraphState):
