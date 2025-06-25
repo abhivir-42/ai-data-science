@@ -1054,7 +1054,7 @@ print("🚀 Registering enhanced data analysis uAgent...")
 agent_info = tool.invoke(
     {
         "agent_obj": data_analysis_agent_func,  # Pass the function
-        "name": "AI Data Engineering Agent",
+        "name": "AI Data Science Agent",
         "port": 8102,
         "description": "🤖 AI Data Analysis Chatbot - Send me a CSV URL and analysis request. I'll clean your data, engineer features, and build ML models. Example: 'Clean and analyze https://example.com/data.csv for prediction'",
         "api_token": API_TOKEN,
@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
     try:
         print("\n🎉 ENHANCED DATA ANALYSIS UAGENT IS RUNNING!")
         print("=" * 60)
-        print(f"🔗 Agent name: AI Data Engineering Agent")
+        print(f"🔗 Agent name: AI Data Science Agent")
         print(f"🔗 Agent address: {agent_address}")
         print(f"🌐 Port: {agent_port}")
         print(f"🎯 Inspector: https://agentverse.ai/inspect/?uri=http%3A//127.0.0.1%3A{agent_port}&address={agent_address}")
@@ -1102,6 +1102,6 @@ if __name__ == "__main__":
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down AI Data Engineering Agent...")
-        cleanup_uagent("AI Data Engineering Agent")
+        print("\n🛑 Shutting down AI Data Science Agent...")
+        cleanup_uagent("AI Data Science Agent")
         print("✅ Agent stopped.") 
