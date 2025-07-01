@@ -16,7 +16,7 @@ import re
 import pandas as pd
 import requests
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 from dotenv import load_dotenv
 
 # Add src to path
