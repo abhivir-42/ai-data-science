@@ -546,8 +546,11 @@ class DataAnalysisAgent:
             )
             result_str = str(result_dict)
             
-            # Parse result and create metrics
-            ml_metrics = self._extract_ml_metrics(result_str, params)
+            # Parse result and create metrics - pass H2O agent instance for rich data extraction
+            enhanced_params = params.copy()
+            enhanced_params["h2o_agent"] = self.h2o_ml_agent
+            enhanced_params["training_time"] = execution_time
+            ml_metrics = self._extract_ml_metrics(result_str, enhanced_params)
             
             execution_time = time.time() - start_time
             
@@ -696,9 +699,207 @@ class DataAnalysisAgent:
         return None
     
     def _extract_ml_metrics(self, result_str: str, params: Dict[str, Any]) -> Optional[MLModelingMetrics]:
-        """Extract ML modeling metrics from result."""
-        # This would parse the actual agent output
-        return None
+        """Extract comprehensive ML modeling metrics from H2O agent results."""
+        try:
+            # Get the H2O ML agent instance from params
+            h2o_agent = params.get("h2o_agent")
+            if not h2o_agent:
+                logger.warning("No H2O agent found in params for metrics extraction")
+                return None
+            
+            # Extract rich ML data from H2O agent
+            leaderboard_data = h2o_agent.get_leaderboard()
+            best_model_id = h2o_agent.get_best_model_id()
+            model_path = h2o_agent.get_model_path()
+            generated_code = h2o_agent.get_h2o_train_function()
+            recommended_steps = h2o_agent.get_recommended_ml_steps()
+            
+            # Process leaderboard data
+            leaderboard_dict = None
+            total_models = 0
+            top_model_metrics = {}
+            
+            if leaderboard_data is not None:
+                try:
+                    # Convert H2O leaderboard to dictionary format
+                    if hasattr(leaderboard_data, 'as_data_frame'):
+                        leaderboard_df = leaderboard_data.as_data_frame()
+                        leaderboard_dict = leaderboard_df.to_dict('records')
+                        total_models = len(leaderboard_df)
+                        
+                        # Extract top model metrics
+                        if len(leaderboard_df) > 0:
+                            top_model = leaderboard_df.iloc[0]
+                            top_model_metrics = top_model.to_dict()
+                    else:
+                        # Handle case where leaderboard is already a DataFrame
+                        leaderboard_dict = leaderboard_data.to_dict('records') if hasattr(leaderboard_data, 'to_dict') else None
+                        total_models = len(leaderboard_data) if leaderboard_data is not None else 0
+                        
+                        if len(leaderboard_data) > 0:
+                            top_model_metrics = leaderboard_data.iloc[0].to_dict() if hasattr(leaderboard_data, 'iloc') else {}
+                            
+                except Exception as e:
+                    logger.warning(f"Could not process leaderboard data: {e}")
+                    leaderboard_dict = None
+                    total_models = 0
+            
+            # Extract model architecture from best model ID
+            model_architecture = self._extract_model_architecture(best_model_id) if best_model_id else None
+            
+            # Get training time from params or estimate
+            training_runtime = params.get("training_time", 0)
+            if training_runtime == 0 and hasattr(h2o_agent, '_params'):
+                training_runtime = h2o_agent._params.get('max_runtime_secs', 0)
+            
+            # Extract feature information
+            features_used = []
+            enhanced_feature_importance = []
+            
+            try:
+                # Try to get feature importance from H2O agent response
+                if hasattr(h2o_agent, 'get_response'):
+                    response = h2o_agent.get_response()
+                    if isinstance(response, dict):
+                        # Look for feature information in the response
+                        if 'features_used' in response:
+                            features_used = response['features_used']
+                        if 'feature_importance' in response:
+                            feature_imp = response['feature_importance']
+                            if isinstance(feature_imp, dict):
+                                enhanced_feature_importance = [
+                                    {"feature": k, "importance": v, "impact": self._categorize_impact(v)}
+                                    for k, v in feature_imp.items()
+                                ]
+            except Exception as e:
+                logger.warning(f"Could not extract feature information: {e}")
+            
+            return MLModelingMetrics(
+                # Core metrics
+                models_trained=total_models or 1,
+                best_model_type=model_architecture,
+                best_model_id=best_model_id,
+                
+                # Performance metrics
+                best_model_score=top_model_metrics.get('auc', top_model_metrics.get('rmse', 0.0)) if top_model_metrics else 0.0,
+                cross_validation_score=top_model_metrics.get('mean_cross_validation_score', None) if top_model_metrics else None,
+                test_set_score=None,  # H2O AutoML doesn't typically provide separate test scores
+                
+                # Model details
+                training_time_seconds=training_runtime,
+                model_size_mb=None,  # Would need to check actual model file size
+                
+                # Feature information
+                features_used=features_used,
+                feature_importance=None,  # Keep original format for backward compatibility
+                
+                # Experiment tracking
+                mlflow_experiment_id=params.get("mlflow_experiment_id"),
+                mlflow_run_id=params.get("mlflow_run_id"),
+                
+                # Enhanced Phase 1 fields
+                model_path=model_path,
+                leaderboard=leaderboard_dict,
+                top_model_metrics=top_model_metrics,
+                total_models_trained=total_models,
+                training_runtime=training_runtime,
+                generated_code=generated_code,
+                recommended_steps=recommended_steps,
+                workflow_summary=self._generate_workflow_summary(h2o_agent),
+                model_architecture=model_architecture,
+                enhanced_feature_importance=enhanced_feature_importance
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to extract ML metrics: {e}")
+            return None
+    
+    def _extract_model_architecture(self, model_id: str) -> Optional[str]:
+        """Extract model architecture type from H2O model ID."""
+        if not model_id:
+            return None
+            
+        model_id_lower = model_id.lower()
+        if 'gbm' in model_id_lower:
+            return "Gradient Boosting Machine (GBM)"
+        elif 'randomforest' in model_id_lower or 'drf' in model_id_lower:
+            return "Random Forest"
+        elif 'glm' in model_id_lower:
+            return "Generalized Linear Model (GLM)"
+        elif 'deeplearning' in model_id_lower or 'dl' in model_id_lower:
+            return "Deep Learning (Neural Network)"
+        elif 'xgboost' in model_id_lower:
+            return "XGBoost"
+        elif 'stackedensemble' in model_id_lower:
+            return "Stacked Ensemble"
+        else:
+            return f"H2O AutoML Model ({model_id.split('_')[0] if '_' in model_id else model_id})"
+    
+    def _categorize_impact(self, importance_score: float) -> str:
+        """Categorize feature importance impact level."""
+        if importance_score >= 0.7:
+            return "Very High"
+        elif importance_score >= 0.5:
+            return "High"
+        elif importance_score >= 0.3:
+            return "Medium"
+        elif importance_score >= 0.1:
+            return "Low"
+        else:
+            return "Very Low"
+    
+    def _generate_workflow_summary(self, h2o_agent) -> str:
+        """Generate a summary of the ML workflow executed."""
+        try:
+            summary_parts = []
+            
+            # Get basic information
+            if hasattr(h2o_agent, '_params'):
+                params = h2o_agent._params
+                summary_parts.append(f"H2O AutoML workflow executed with {params.get('max_runtime_secs', 'default')} second time limit")
+            
+            # Add leaderboard information
+            leaderboard = h2o_agent.get_leaderboard()
+            if leaderboard is not None:
+                try:
+                    if hasattr(leaderboard, 'as_data_frame'):
+                        lb_df = leaderboard.as_data_frame()
+                        model_count = len(lb_df)
+                        summary_parts.append(f"Trained and evaluated {model_count} different models")
+                        
+                        # Get algorithm diversity
+                        algorithms = set()
+                        for _, row in lb_df.iterrows():
+                            model_id = row.get('model_id', '')
+                            if 'GBM' in model_id:
+                                algorithms.add('GBM')
+                            elif 'RandomForest' in model_id or 'DRF' in model_id:
+                                algorithms.add('Random Forest')
+                            elif 'GLM' in model_id:
+                                algorithms.add('GLM')
+                            elif 'DeepLearning' in model_id:
+                                algorithms.add('Deep Learning')
+                            elif 'XGBoost' in model_id:
+                                algorithms.add('XGBoost')
+                            elif 'StackedEnsemble' in model_id:
+                                algorithms.add('Stacked Ensemble')
+                        
+                        if algorithms:
+                            summary_parts.append(f"Algorithms used: {', '.join(sorted(algorithms))}")
+                            
+                except Exception as e:
+                    logger.warning(f"Could not parse leaderboard for workflow summary: {e}")
+            
+            best_model_id = h2o_agent.get_best_model_id()
+            if best_model_id:
+                architecture = self._extract_model_architecture(best_model_id)
+                summary_parts.append(f"Best performing model: {architecture}")
+            
+            return ". ".join(summary_parts) + "." if summary_parts else "H2O AutoML workflow completed successfully."
+            
+        except Exception as e:
+            logger.warning(f"Could not generate workflow summary: {e}")
+            return "H2O AutoML workflow completed."
     
     def _calculate_overall_quality_score(self, agent_results: List[AgentExecutionResult]) -> float:
         """Calculate overall data quality score."""
