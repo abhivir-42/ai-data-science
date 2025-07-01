@@ -546,13 +546,14 @@ class DataAnalysisAgent:
             )
             result_str = str(result_dict)
             
+            # Calculate execution time first
+            execution_time = time.time() - start_time
+            
             # Parse result and create metrics - pass H2O agent instance for rich data extraction
             enhanced_params = params.copy()
             enhanced_params["h2o_agent"] = self.h2o_ml_agent
             enhanced_params["training_time"] = execution_time
             ml_metrics = self._extract_ml_metrics(result_str, enhanced_params)
-            
-            execution_time = time.time() - start_time
             
             return AgentExecutionResult(
                 agent_name="h2o_ml",
