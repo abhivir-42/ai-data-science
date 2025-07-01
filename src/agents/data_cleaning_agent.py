@@ -14,6 +14,10 @@ import pandas as pd
 from IPython.display import Markdown
 import numpy as np
 
+# Fix matplotlib backend to prevent GUI crashes in threading environments
+import matplotlib
+matplotlib.use('Agg')
+
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import BaseMessage
 from langgraph.types import Command

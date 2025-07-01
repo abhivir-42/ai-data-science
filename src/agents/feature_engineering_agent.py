@@ -6,6 +6,10 @@
 from typing import TypedDict, Annotated, Sequence, Literal
 import operator
 
+# Fix matplotlib backend to prevent GUI crashes in threading environments
+import matplotlib
+matplotlib.use('Agg')
+
 from langchain.prompts import PromptTemplate
 from langchain_core.messages import BaseMessage
 
