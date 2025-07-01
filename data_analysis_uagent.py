@@ -1205,29 +1205,93 @@ def format_analysis_result(result) -> str:
                 ""
             ])
         
+        # SPECIFIC AGENT RESULTS SECTIONS WITH PROMINENT DOWNLOAD LINKS
+        
+        # Data Cleaning Results Section
+        data_cleaning_result = None
+        feature_engineering_result = None
+        ml_agent_result = None
+        
+        for agent_result in result.agent_results:
+            if agent_result.agent_name == "data_cleaning":
+                data_cleaning_result = agent_result
+            elif agent_result.agent_name == "feature_engineering":
+                feature_engineering_result = agent_result
+            elif agent_result.agent_name == "h2o_ml":
+                ml_agent_result = agent_result
+        
+        # 1. DATA CLEANING RESULTS WITH TMPFILES LINKS
+        if data_cleaning_result:
+            if data_cleaning_result.success and data_cleaning_result.output_data_path:
+                lines.extend([
+                    "🧹 **DATA CLEANING COMPLETED**",
+                    "=" * 40,
+                    ""
+                ])
+                
+                # Add the cleaned data download links using tmpfiles.org
+                lines.extend(create_shareable_csv_link(
+                    data_cleaning_result.output_data_path,
+                    "cleaned_data",
+                    "Cleaned Dataset"
+                ))
+                lines.append("")
+                
+            elif not data_cleaning_result.success:
+                lines.extend([
+                    "🧹 **DATA CLEANING FAILED**",
+                    "=" * 40,
+                    f"   ❌ Error: {getattr(data_cleaning_result, 'error_message', 'Unknown error')}",
+                    f"   ⏱️  Runtime: {data_cleaning_result.execution_time_seconds:.2f} seconds",
+                    ""
+                ])
+        
+        # 2. FEATURE ENGINEERING RESULTS WITH TMPFILES LINKS  
+        if feature_engineering_result:
+            if feature_engineering_result.success and feature_engineering_result.output_data_path:
+                lines.extend([
+                    "🔧 **FEATURE ENGINEERING COMPLETED**",
+                    "=" * 40,
+                    ""
+                ])
+                
+                # Add the feature engineered data download links using tmpfiles.org
+                lines.extend(create_shareable_csv_link(
+                    feature_engineering_result.output_data_path,
+                    "feature_engineered_data", 
+                    "Feature Engineered Dataset"
+                ))
+                lines.append("")
+                
+            elif not feature_engineering_result.success:
+                lines.extend([
+                    "🔧 **FEATURE ENGINEERING FAILED**",
+                    "=" * 40,
+                    f"   ❌ Error: {getattr(feature_engineering_result, 'error_message', 'Unknown error')}",
+                    f"   ⏱️  Runtime: {feature_engineering_result.execution_time_seconds:.2f} seconds",
+                    ""
+                ])
+
         # Workflow information with actual execution results - Enhanced ML Display
         if result.workflow_intent:
-            # Check actual execution results
+            # Check actual execution results for summary
             data_cleaning_status = "❌ Not executed"
             feature_engineering_status = "❌ Not executed"  
             ml_modeling_status = "❌ Not executed"
-            ml_agent_result = None
             
-            for agent_result in result.agent_results:
-                if agent_result.agent_name == "data_cleaning":
-                    data_cleaning_status = "✅ Success" if agent_result.success else f"❌ Failed: {getattr(agent_result, 'error_message', 'Unknown error')[:50]}..."
-                elif agent_result.agent_name == "feature_engineering":
-                    feature_engineering_status = "✅ Success" if agent_result.success else f"❌ Failed: {getattr(agent_result, 'error_message', 'Unknown error')[:50]}..."
-                elif agent_result.agent_name == "h2o_ml":
-                    if agent_result.success:
-                        ml_modeling_status = "✅ Success"
-                        ml_agent_result = agent_result  # Store for rich display
-                    else:
-                        ml_modeling_status = f"❌ Failed: {getattr(agent_result, 'error_message', 'Unknown error')[:50]}..."
+            if data_cleaning_result:
+                data_cleaning_status = "✅ Success" if data_cleaning_result.success else f"❌ Failed: {getattr(data_cleaning_result, 'error_message', 'Unknown error')[:50]}..."
+            if feature_engineering_result:
+                feature_engineering_status = "✅ Success" if feature_engineering_result.success else f"❌ Failed: {getattr(feature_engineering_result, 'error_message', 'Unknown error')[:50]}..."
+            if ml_agent_result:
+                if ml_agent_result.success:
+                    ml_modeling_status = "✅ Success"
+                else:
+                    ml_modeling_status = f"❌ Failed: {getattr(ml_agent_result, 'error_message', 'Unknown error')[:50]}..."
             
             # Basic workflow status 
             lines.extend([
-                "🔄 **WORKFLOW EXECUTION RESULTS**:",
+                "🔄 **WORKFLOW EXECUTION SUMMARY**:",
                 f"   • Data Cleaning: {data_cleaning_status}",
                 f"   • Feature Engineering: {feature_engineering_status}",
                 f"   • ML Modeling: {ml_modeling_status}",
