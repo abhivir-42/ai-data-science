@@ -37,7 +37,7 @@ Transform the ML agent into a comprehensive ML workflow platform that:
 - Generate shareable download links for trained models
 - Handle binary model file compression and upload
 
-**Phase 3: Session Memory + Prediction Interface** (High Impact, Medium Risk)
+**Phase 3: Session Memory + Structured Prediction Intent Recognition** (High Impact, Medium Risk)
 - Implement LangChain memory patterns for within-session model persistence
 - Add intent recognition for prediction vs training requests
 - Create interactive prediction interface with batch prediction support
@@ -617,578 +617,1000 @@ def format_model_download_section(self, model_package_url: str, model_id: str, p
 
 ---
 
-## Phase 3: Session Memory + Prediction Interface
+## Phase 3: Session Memory + Structured Prediction Intent Recognition
 
-### 3.1 Enhanced Schema for Model Persistence
+### **Overview**
+Replace hardcoded regex patterns with sophisticated **LangChain structured output system** that extends existing `WorkflowIntent` schema and `DataAnalysisIntentParser` patterns for intelligent prediction intent recognition.
 
-**File**: `ai-data-science/src/schemas/data_analysis_schemas.py`
+### **3.1 Enhanced Schema Design**
 
-**Enhancement**: Add model persistence schema:
+#### **Extend WorkflowIntent Schema**
 ```python
-@dataclass
-class TrainedModelSession:
-    """Stores information about trained models in current session."""
-    model_id: str
-    model_path: str
-    model_package_url: Optional[str] = None
-    training_timestamp: str = ""
-    dataset_used: Optional[str] = None
-    target_column: Optional[str] = None
-    model_type: Optional[str] = None
-    performance_metrics: Optional[Dict[str, float]] = None
-    feature_columns: Optional[List[str]] = None
-    
-@dataclass 
-class PredictionRequest:
-    """Schema for prediction requests."""
-    model_id: str
-    input_data: Dict[str, Any]
-    prediction_type: str = "single"  # "single" or "batch"
+# In src/schemas/data_analysis_schemas.py
 
-@dataclass
-class PredictionResponse:
-    """Schema for prediction responses."""
-    model_id: str
-    predictions: List[Any]
-    prediction_probabilities: Optional[List[float]] = None
-    feature_importance: Optional[Dict[str, float]] = None
-    confidence_score: Optional[float] = None
+class SessionContext(BaseModel):
+    """Session context for tracking available models and conversation state"""
+    
+    # Available Models
+    available_models: List[str] = Field(
+        default_factory=list,
+        description="List of model IDs available in this session"
+    )
+    model_metadata: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Metadata for each available model (performance, features, etc.)"
+    )
+    
+    # Session State
+    session_id: str = Field(description="Unique session identifier")
+    last_analysis_timestamp: Optional[str] = Field(
+        default=None,
+        description="Timestamp of last analysis performed"
+    )
+    conversation_context: List[str] = Field(
+        default_factory=list,
+        description="Key conversation points for context"
+    )
+
+class PredictionIntent(BaseModel):
+    """LLM-parsed prediction intent with session awareness"""
+    
+    # Core Prediction Recognition
+    is_prediction_request: bool = Field(
+        description="User wants to make predictions with an existing model"
+    )
+    is_batch_prediction: bool = Field(
+        description="User wants to make predictions on multiple data points"
+    )
+    is_single_prediction: bool = Field(
+        description="User wants to make a single prediction"
+    )
+    
+    # Model Selection
+    requested_model_id: Optional[str] = Field(
+        default=None,
+        description="Specific model ID requested by user (if mentioned)"
+    )
+    use_best_model: bool = Field(
+        description="User wants to use the best performing model"
+    )
+    use_latest_model: bool = Field(
+        description="User wants to use the most recently trained model"
+    )
+    
+    # Input Data Recognition
+    input_data_provided: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Prediction input data extracted from user message"
+    )
+    input_data_format: Literal["individual_values", "csv_reference", "json_object", "none"] = Field(
+        description="Format of input data provided"
+    )
+    
+    # User Guidance Needs
+    needs_input_guidance: bool = Field(
+        description="User needs guidance on what input data to provide"
+    )
+    needs_model_explanation: bool = Field(
+        description="User wants explanation of available models"
+    )
+    
+    # Confidence Scores
+    prediction_intent_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for prediction intent parsing"
+    )
+
+class EnhancedWorkflowIntent(BaseModel):
+    """Extended WorkflowIntent with prediction capabilities"""
+    
+    # Inherit all existing fields from WorkflowIntent
+    needs_data_cleaning: bool = Field(description="Requires data cleaning/preprocessing")
+    needs_feature_engineering: bool = Field(description="Requires feature engineering")
+    needs_ml_modeling: bool = Field(description="Requires ML model training")
+    
+    data_quality_focus: bool = Field(description="Primary focus on data quality issues")
+    exploratory_analysis: bool = Field(description="Needs exploratory data analysis")
+    prediction_focus: bool = Field(description="Primary goal is prediction/modeling")
+    statistical_analysis: bool = Field(description="Needs statistical analysis and insights")
+    
+    suggested_target_variable: Optional[str] = Field(default=None)
+    suggested_problem_type: Optional[ProblemType] = Field(default=None)
+    key_requirements: List[str] = Field(description="Key requirements extracted from user request")
+    complexity_level: Literal["simple", "moderate", "complex"] = Field(description="Assessed complexity level")
+    intent_confidence: float = Field(ge=0.0, le=1.0)
+    target_variable_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    
+    # NEW: Prediction Intent Integration
+    prediction_intent: Optional[PredictionIntent] = Field(
+        default=None,
+        description="Prediction-specific intent analysis"
+    )
+    
+    # NEW: Multi-Intent Recognition
+    is_multi_intent_request: bool = Field(
+        description="Request contains both training and prediction intents"
+    )
+    primary_intent: Literal["training", "prediction", "exploration", "analysis"] = Field(
+        description="Primary intent when multiple intents are present"
+    )
+    
+    # NEW: Session Context Integration
+    session_context_available: bool = Field(
+        description="Whether session context with available models is present"
+    )
+
+class PredictionRequest(BaseModel):
+    """Structured prediction request with input validation"""
+    
+    model_id: str = Field(description="ID of the model to use for prediction")
+    input_data: Dict[str, Any] = Field(description="Input data for prediction")
+    
+    # Prediction Options
+    include_probabilities: bool = Field(
+        default=True,
+        description="Include prediction probabilities in output"
+    )
+    include_explanations: bool = Field(
+        default=True,
+        description="Include feature importance explanations"
+    )
+    include_confidence_intervals: bool = Field(
+        default=False,
+        description="Include confidence intervals for predictions"
+    )
+    
+    # Validation
+    @field_validator('input_data')
+    @classmethod
+    def validate_input_data(cls, v):
+        if not v:
+            raise ValueError("Input data cannot be empty")
+        return v
+
+class PredictionResult(BaseModel):
+    """Structured prediction result with comprehensive output"""
+    
+    # Prediction Output
+    prediction: Any = Field(description="The predicted value")
+    prediction_probabilities: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Class probabilities for classification"
+    )
+    prediction_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for the prediction"
+    )
+    
+    # Model Information
+    model_id: str = Field(description="ID of the model used")
+    model_type: str = Field(description="Type of model used")
+    model_performance: Dict[str, float] = Field(
+        description="Key performance metrics of the model"
+    )
+    
+    # Explanations
+    feature_importance: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Feature importance for this prediction"
+    )
+    explanation_text: str = Field(
+        description="Human-readable explanation of the prediction"
+    )
+    
+    # Metadata
+    prediction_timestamp: str = Field(
+        default_factory=lambda: datetime.now().isoformat(),
+        description="Timestamp when prediction was made"
+    )
+    processing_time_ms: float = Field(description="Time taken for prediction in milliseconds")
 ```
 
-### 3.2 LangChain Memory Implementation
-
-**File**: `ai-data-science/data_analysis_uagent.py`
-
-**Enhancement**: Implement session memory following LangChain Academy patterns:
+#### **Session-Aware Intent Parser**
 ```python
-from typing import Dict, List, Optional
-import json
-import os
-from datetime import datetime
+# In src/parsers/intent_parser.py
 
-class MLAgentSessionMemory:
-    """Manages trained models and conversation context within a session."""
+class SessionAwareIntentParser(DataAnalysisIntentParser):
+    """Enhanced intent parser with session context and prediction recognition"""
     
-    def __init__(self, session_id: str):
-        self.session_id = session_id
-        self.trained_models: Dict[str, TrainedModelSession] = {}
-        self.conversation_history: List[Dict[str, Any]] = []
-        self.session_start_time = datetime.now()
+    def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.1):
+        super().__init__(model_name, temperature)
         
-    def save_trained_model(self, model_session: TrainedModelSession):
-        """Save a trained model to session memory."""
-        self.trained_models[model_session.model_id] = model_session
-        logger.info(f"Saved model {model_session.model_id} to session memory")
+        # Create enhanced output parser for new schema
+        self.enhanced_output_parser = PydanticOutputParser(pydantic_object=EnhancedWorkflowIntent)
+        
+        # Create prediction-specific parser
+        self.prediction_parser = PydanticOutputParser(pydantic_object=PredictionIntent)
+        
+        # Session context tracking
+        self.session_contexts: Dict[str, SessionContext] = {}
+        
+        # Create enhanced prompt template
+        self.enhanced_prompt_template = self._create_enhanced_prompt_template()
+        
+        # Create enhanced chain
+        self.enhanced_chain = self.enhanced_prompt_template | self.llm | self.enhanced_output_parser
     
-    def get_trained_model(self, model_id: str) -> Optional[TrainedModelSession]:
-        """Retrieve a trained model from session memory."""
-        return self.trained_models.get(model_id)
+    def _create_enhanced_prompt_template(self) -> ChatPromptTemplate:
+        """Create enhanced prompt template with session context and prediction recognition"""
+        
+        system_prompt = """You are an expert data scientist and AI assistant with advanced session awareness. 
+        
+        Your task is to analyze user requests and determine:
+        1. WORKFLOW INTENT: What data analysis steps are needed (cleaning, feature engineering, ML modeling)
+        2. PREDICTION INTENT: Whether the user wants to make predictions with existing models
+        3. SESSION CONTEXT: How to use available models and conversation history
+        
+        CRITICAL ANALYSIS RULES:
+        - WORKFLOW INTENT: Only set needs_* flags if user explicitly requests those steps
+        - PREDICTION INTENT: Carefully detect if user wants to make predictions vs. train new models
+        - SESSION AWARENESS: Consider available models when determining prediction intent
+        - MULTI-INTENT: Handle requests that combine training and prediction
+        
+        PREDICTION INTENT DETECTION:
+        - Look for phrases like: "predict", "forecast", "classify", "estimate", "what would happen if"
+        - Check if user provides input data for prediction
+        - Determine if they want single predictions vs. batch predictions
+        - Identify if they reference specific models or want the "best" model
+        
+        SESSION CONTEXT INTEGRATION:
+        - If models are available, prioritize prediction intent over training
+        - Consider conversation history for context
+        - Suggest appropriate models based on user's request
+        
+        RESPONSE REQUIREMENTS:
+        - Provide valid JSON matching the EnhancedWorkflowIntent schema
+        - Set confidence scores between 0.7-1.0 for clear requests
+        - Use prediction_intent field for all prediction-related analysis
+        - Set is_multi_intent_request=true when both training and prediction are requested"""
+
+        user_prompt = """USER REQUEST: {user_request}
+
+        DATASET INFORMATION:
+        - CSV URL: {csv_url}
+        - Dataset Shape: {data_shape}
+        - Column Names: {column_names}
+        - Data Types: {data_types}
+        - Sample Data: {sample_data}
+
+        SESSION CONTEXT:
+        - Available Models: {available_models}
+        - Model Metadata: {model_metadata}
+        - Conversation History: {conversation_context}
+        - Session ID: {session_id}
+
+        Analyze this request with full session awareness and provide structured intent analysis.
+
+        {format_instructions}"""
+
+        return ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("user", user_prompt)
+        ])
     
-    def list_trained_models(self) -> List[TrainedModelSession]:
-        """List all trained models in current session."""
-        return list(self.trained_models.values())
-    
-    def add_conversation_turn(self, user_input: str, agent_response: str, action_type: str):
-        """Add a conversation turn to memory."""
-        self.conversation_history.append({
-            "timestamp": datetime.now().isoformat(),
-            "user_input": user_input,
-            "agent_response": agent_response,
-            "action_type": action_type
-        })
-    
-    def get_session_summary(self) -> Dict[str, Any]:
-        """Get summary of current session."""
-        return {
-            "session_id": self.session_id,
-            "session_duration": (datetime.now() - self.session_start_time).total_seconds(),
-            "models_trained": len(self.trained_models),
-            "conversation_turns": len(self.conversation_history),
-            "trained_models": [model.model_id for model in self.trained_models.values()]
+    def parse_intent_with_session(
+        self,
+        user_request: str,
+        csv_url: str,
+        session_id: str,
+        data_info: Optional[Dict[str, Any]] = None,
+        max_retries: int = 3
+    ) -> EnhancedWorkflowIntent:
+        """Parse intent with full session context awareness"""
+        
+        # Get or create session context
+        session_context = self.session_contexts.get(session_id, SessionContext(session_id=session_id))
+        
+        # Prepare enhanced input data
+        enhanced_input = {
+            "user_request": user_request,
+            "csv_url": csv_url,
+            "data_shape": data_info.get("shape", "Unknown") if data_info else "Unknown",
+            "column_names": data_info.get("columns", []) if data_info else [],
+            "data_types": data_info.get("dtypes", {}) if data_info else {},
+            "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+            "available_models": session_context.available_models,
+            "model_metadata": session_context.model_metadata,
+            "conversation_context": session_context.conversation_context,
+            "session_id": session_id,
+            "format_instructions": self.enhanced_output_parser.get_format_instructions()
         }
-
-# Global session memory (in production, this would be Redis/database)
-_session_memories: Dict[str, MLAgentSessionMemory] = {}
-
-def get_session_memory(session_id: str) -> MLAgentSessionMemory:
-    """Get or create session memory for a given session ID."""
-    if session_id not in _session_memories:
-        _session_memories[session_id] = MLAgentSessionMemory(session_id)
-    return _session_memories[session_id]
-```
-
-### 3.3 Intent Recognition for Predictions
-
-**Enhancement**: Add intent recognition:
-```python
-import re
-from typing import Tuple, Optional
-
-def detect_prediction_intent(user_message: str, session_memory: MLAgentSessionMemory) -> Tuple[bool, Optional[str], Optional[Dict[str, Any]]]:
-    """
-    Detect if user wants to make predictions with a trained model.
-    Returns: (is_prediction_request, model_id, prediction_data)
-    """
-    
-    # Patterns that indicate prediction intent
-    prediction_patterns = [
-        r"predict.*with.*model",
-        r"use.*model.*to.*predict",
-        r"make.*prediction",
-        r"predict.*using",
-        r"what.*would.*model.*predict",
-        r"run.*prediction",
-        r"test.*model.*on",
-        r"apply.*model.*to"
-    ]
-    
-    # Patterns for model interpretation/explanation
-    interpretation_patterns = [
-        r"explain.*model",
-        r"interpret.*model",
-        r"why.*did.*model",
-        r"what.*features.*important",
-        r"feature.*importance",
-        r"model.*explanation"
-    ]
-    
-    # Patterns for model comparison
-    comparison_patterns = [
-        r"compare.*models",
-        r"which.*model.*better",
-        r"model.*comparison",
-        r"best.*model",
-        r"rank.*models"
-    ]
-    
-    # Patterns for validation requests
-    validation_patterns = [
-        r"validate.*model",
-        r"test.*model.*performance",
-        r"model.*validation",
-        r"how.*good.*model",
-        r"model.*accuracy"
-    ]
-    
-    user_message_lower = user_message.lower()
-    
-    # Check for prediction intent
-    is_prediction_request = any(re.search(pattern, user_message_lower) for pattern in prediction_patterns)
-    
-    if not is_prediction_request:
-        return False, None, None
-    
-    # Try to identify which model to use
-    model_id = None
-    trained_models = session_memory.list_trained_models()
-    
-    if len(trained_models) == 1:
-        # Only one model available - use it
-        model_id = trained_models[0].model_id
-    else:
-        # Multiple models - try to identify which one
-        for model in trained_models:
-            if model.model_id.lower() in user_message_lower:
-                model_id = model.model_id
-                break
         
-        # If still no match, use the most recent model
-        if not model_id and trained_models:
-            model_id = max(trained_models, key=lambda m: m.training_timestamp).model_id
-    
-    # Extract prediction data from message
-    prediction_data = extract_prediction_data(user_message, session_memory.get_trained_model(model_id))
-    
-    return True, model_id, prediction_data
-
-def extract_prediction_data(user_message: str, model_session: Optional[TrainedModelSession]) -> Optional[Dict[str, Any]]:
-    """Extract prediction data from user message."""
-    if not model_session or not model_session.feature_columns:
-        return None
-    
-    prediction_data = {}
-    
-    # Try to extract values for each feature
-    for feature in model_session.feature_columns:
-        # Look for patterns like "age=25", "income=50000", etc.
-        pattern = rf"{feature.lower()}\s*[=:]\s*([0-9]+\.?[0-9]*)"
-        match = re.search(pattern, user_message.lower())
-        
-        if match:
+        # Parse with retries
+        for attempt in range(max_retries):
             try:
-                value = float(match.group(1))
-                prediction_data[feature] = value
-            except ValueError:
-                continue
+                result = self.enhanced_chain.invoke(enhanced_input)
+                
+                # Update session context with conversation
+                session_context.conversation_context.append(f"User: {user_request}")
+                session_context.last_analysis_timestamp = datetime.now().isoformat()
+                self.session_contexts[session_id] = session_context
+                
+                logger.info(f"Successfully parsed enhanced intent with confidence: {result.intent_confidence}")
+                return result
+                
+            except Exception as e:
+                logger.warning(f"Attempt {attempt + 1}/{max_retries} - Enhanced intent parsing failed: {e}")
+                if attempt < max_retries - 1:
+                    continue
+        
+        raise RuntimeError(f"Enhanced intent parsing failed after {max_retries} attempts")
     
-    return prediction_data if prediction_data else None
+    def update_session_models(self, session_id: str, model_id: str, model_metadata: Dict[str, Any]):
+        """Update available models in session context"""
+        
+        if session_id not in self.session_contexts:
+            self.session_contexts[session_id] = SessionContext(session_id=session_id)
+        
+        session_context = self.session_contexts[session_id]
+        
+        # Add model to available models
+        if model_id not in session_context.available_models:
+            session_context.available_models.append(model_id)
+        
+        # Update model metadata
+        session_context.model_metadata[model_id] = model_metadata
+        
+        logger.info(f"Updated session {session_id} with model {model_id}")
+    
+    def get_session_context(self, session_id: str) -> SessionContext:
+        """Get session context for a given session ID"""
+        return self.session_contexts.get(session_id, SessionContext(session_id=session_id))
+    
+    def clear_session(self, session_id: str):
+        """Clear session context"""
+        if session_id in self.session_contexts:
+            del self.session_contexts[session_id]
+            logger.info(f"Cleared session {session_id}")
 ```
 
-### 3.4 Prediction Execution Engine
-
-**Enhancement**: Add prediction capabilities:
+#### **Session Memory Integration**
 ```python
-def handle_prediction_request(self, model_id: str, prediction_data: Dict[str, Any], session_memory: MLAgentSessionMemory) -> List[str]:
-    """Handle prediction requests using trained models."""
+# In src/memory/session_memory.py
+
+class SessionMemoryManager:
+    """Manages session-scoped memory for trained models and conversation state"""
     
-    model_session = session_memory.get_trained_model(model_id)
-    if not model_session:
-        return [f"❌ **Model Not Found**: No model with ID '{model_id}' found in this session."]
-    
-    try:
-        # Load the H2O model
-        import h2o
-        if not h2o.cluster():
-            h2o.init()
-            
-        model = h2o.load_model(model_session.model_path)
+    def __init__(self, storage_backend: str = "memory"):
+        """Initialize session memory manager"""
+        self.storage_backend = storage_backend
+        self.sessions: Dict[str, Dict[str, Any]] = {}
         
-        # Create H2O frame from prediction data
-        prediction_frame = h2o.H2OFrame(prediction_data)
+        # Model storage
+        self.model_storage_path = Path("session_models")
+        self.model_storage_path.mkdir(exist_ok=True)
+    
+    async def store_model(
+        self,
+        session_id: str,
+        model_id: str,
+        model_path: str,
+        model_metadata: Dict[str, Any]
+    ) -> bool:
+        """Store a trained model in session memory"""
+        
+        try:
+            # Ensure session exists
+            if session_id not in self.sessions:
+                self.sessions[session_id] = {
+                    "models": {},
+                    "conversation_history": [],
+                    "created_at": datetime.now().isoformat()
+                }
+            
+            # Store model metadata
+            self.sessions[session_id]["models"][model_id] = {
+                "model_path": model_path,
+                "metadata": model_metadata,
+                "created_at": datetime.now().isoformat(),
+                "last_used": None
+            }
+            
+            logger.info(f"Stored model {model_id} in session {session_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to store model {model_id} in session {session_id}: {e}")
+            return False
+    
+    async def load_model(self, session_id: str, model_id: str) -> Optional[Dict[str, Any]]:
+        """Load a model from session memory"""
+        
+        try:
+            if session_id not in self.sessions:
+                return None
+            
+            if model_id not in self.sessions[session_id]["models"]:
+                return None
+            
+            model_info = self.sessions[session_id]["models"][model_id]
+            
+            # Update last used timestamp
+            model_info["last_used"] = datetime.now().isoformat()
+            
+            return model_info
+            
+        except Exception as e:
+            logger.error(f"Failed to load model {model_id} from session {session_id}: {e}")
+            return None
+    
+    def get_available_models(self, session_id: str) -> List[Dict[str, Any]]:
+        """Get list of available models in session"""
+        
+        if session_id not in self.sessions:
+            return []
+        
+        models = []
+        for model_id, model_info in self.sessions[session_id]["models"].items():
+            models.append({
+                "model_id": model_id,
+                "model_type": model_info["metadata"].get("model_type", "unknown"),
+                "performance": model_info["metadata"].get("performance", {}),
+                "created_at": model_info["created_at"],
+                "last_used": model_info["last_used"]
+            })
+        
+        return models
+    
+    def get_best_model(self, session_id: str, metric: str = "auc") -> Optional[str]:
+        """Get the best performing model in session"""
+        
+        if session_id not in self.sessions:
+            return None
+        
+        best_model_id = None
+        best_score = -1
+        
+        for model_id, model_info in self.sessions[session_id]["models"].items():
+            performance = model_info["metadata"].get("performance", {})
+            score = performance.get(metric, 0)
+            
+            if score > best_score:
+                best_score = score
+                best_model_id = model_id
+        
+        return best_model_id
+    
+    def clear_session(self, session_id: str):
+        """Clear session memory"""
+        if session_id in self.sessions:
+            del self.sessions[session_id]
+            logger.info(f"Cleared session memory for {session_id}")
+```
+
+#### **Enhanced Data Analysis Agent Integration**
+```python
+# In src/agents/data_analysis_agent.py - Add new methods
+
+class DataAnalysisAgent:
+    """Enhanced data analysis agent with session awareness and prediction capabilities"""
+    
+    def __init__(self, output_dir: str = "outputs", enable_session_memory: bool = True):
+        # ... existing initialization ...
+        
+        # NEW: Session-aware components
+        self.session_memory = SessionMemoryManager() if enable_session_memory else None
+        self.session_intent_parser = SessionAwareIntentParser()
+        self.prediction_engine = PredictionEngine()
+    
+    async def analyze_with_session(
+        self,
+        csv_url: str,
+        user_request: str,
+        session_id: str,
+        **kwargs
+    ) -> DataAnalysisResult:
+        """Perform analysis with full session context"""
+        
+        self.execution_start_time = time.time()
+        
+        try:
+            # Parse intent with session context
+            intent = self.session_intent_parser.parse_intent_with_session(
+                user_request, csv_url, session_id
+            )
+            
+            # Handle multi-intent requests
+            if intent.is_multi_intent_request:
+                return await self._handle_multi_intent_request(intent, session_id, **kwargs)
+            
+            # Handle pure prediction requests
+            elif intent.prediction_intent and intent.prediction_intent.is_prediction_request:
+                return await self._handle_prediction_request(intent, session_id, **kwargs)
+            
+            # Handle training requests with session context
+            else:
+                result = await self._handle_training_request(intent, session_id, **kwargs)
+                
+                # Store trained models in session memory
+                if self.session_memory and result.agent_results:
+                    await self._store_session_models(result, session_id)
+                
+                return result
+                
+        except Exception as e:
+            logger.error(f"Session-aware analysis failed: {e}")
+            return self._create_error_result(csv_url, user_request, str(e))
+    
+    async def _handle_prediction_request(
+        self,
+        intent: EnhancedWorkflowIntent,
+        session_id: str,
+        **kwargs
+    ) -> DataAnalysisResult:
+        """Handle pure prediction requests using session models"""
+        
+        prediction_intent = intent.prediction_intent
+        
+        # Get available models
+        available_models = self.session_memory.get_available_models(session_id)
+        
+        if not available_models:
+            return self._create_error_result(
+                "", 
+                intent.key_requirements[0] if intent.key_requirements else "prediction request",
+                "No trained models available in this session. Please train a model first."
+            )
+        
+        # Select model based on user intent
+        model_id = self._select_model_for_prediction(prediction_intent, available_models)
+        
+        # Load model
+        model_info = await self.session_memory.load_model(session_id, model_id)
         
         # Make prediction
-        predictions = model.predict(prediction_frame)
-        prediction_result = predictions.as_data_frame()
+        prediction_result = await self.prediction_engine.predict(
+            model_info=model_info,
+            input_data=prediction_intent.input_data_provided,
+            include_explanations=True
+        )
         
-        # Format results
-        lines = self.format_prediction_results(model_id, prediction_data, prediction_result, model_session)
-        
-        return lines
-        
-    except Exception as e:
-        logger.error(f"Prediction failed: {e}")
-        return [f"❌ **Prediction Failed**: {str(e)}"]
-
-def format_prediction_results(self, model_id: str, input_data: Dict[str, Any], prediction_result, model_session: TrainedModelSession) -> List[str]:
-    """Format prediction results for user display."""
+        # Generate result
+        return self._generate_prediction_result(prediction_result, intent, model_info)
     
-    lines = [
-        "🔮 **PREDICTION RESULTS**",
-        "=" * 40,
-        "",
-        f"🎯 **Model Used**: {model_id}",
-        f"📊 **Model Type**: {model_session.model_type}",
-        ""
-    ]
-    
-    # Display input data
-    lines.extend([
-        "📥 **Input Data**:",
-        ""
-    ])
-    
-    for feature, value in input_data.items():
-        lines.append(f"   • **{feature}**: {value}")
-    
-    lines.append("")
-    
-    # Display prediction
-    if not prediction_result.empty:
-        prediction_value = prediction_result.iloc[0, 0]  # First row, first column
+    def _select_model_for_prediction(
+        self,
+        prediction_intent: PredictionIntent,
+        available_models: List[Dict[str, Any]]
+    ) -> str:
+        """Select appropriate model based on prediction intent"""
         
-        lines.extend([
-            "🎯 **Prediction**:",
-            f"   • **Result**: `{prediction_value}`",
-            ""
-        ])
+        if prediction_intent.requested_model_id:
+            # User specified a specific model
+            return prediction_intent.requested_model_id
         
-        # If classification, show probabilities
-        if len(prediction_result.columns) > 1:
-            lines.append("📊 **Prediction Probabilities**:")
-            for col in prediction_result.columns[1:]:  # Skip the prediction column
-                prob_value = prediction_result.iloc[0][col]
-                lines.append(f"   • **{col}**: {prob_value:.4f}")
-            lines.append("")
-    
-    # Add confidence note
-    lines.extend([
-        "⚠️ **Note**: This prediction is based on the model's training data.",
-        "Always validate results against domain expertise.",
-        ""
-    ])
-    
-    return lines
-```
-
----
-
-## Phase 4: Advanced ML Features
-
-### 4.1 Model Interpretation & Explainability
-
-**File**: `ai-data-science/data_analysis_uagent.py`
-
-**Enhancement**: Add SHAP-based model interpretation:
-```python
-def generate_model_interpretation(self, model_id: str, session_memory: MLAgentSessionMemory) -> List[str]:
-    """Generate comprehensive model interpretation using SHAP and H2O explanations."""
-    
-    model_session = session_memory.get_trained_model(model_id)
-    if not model_session:
-        return [f"❌ **Model Not Found**: No model with ID '{model_id}' found in this session."]
-    
-    try:
-        import h2o
-        if not h2o.cluster():
-            h2o.init()
-            
-        model = h2o.load_model(model_session.model_path)
+        elif prediction_intent.use_best_model:
+            # User wants the best performing model
+            return self.session_memory.get_best_model(session_id, "auc")
         
-        # Get model explanations
-        explanation = model.explain()
-        feature_importance = model.varimp(use_pandas=True)
+        elif prediction_intent.use_latest_model:
+            # User wants the most recent model
+            return max(available_models, key=lambda x: x["created_at"])["model_id"]
         
-        lines = [
-            "🧠 **MODEL INTERPRETATION & EXPLAINABILITY**",
-            "=" * 50,
-            "",
-            f"🎯 **Model**: {model_id}",
-            f"📊 **Type**: {model_session.model_type}",
-            ""
-        ]
-        
-        # Feature Importance
-        if feature_importance is not None and len(feature_importance) > 0:
-            lines.extend([
-                "📈 **TOP 10 MOST IMPORTANT FEATURES**:",
-                ""
-            ])
-            
-            top_features = feature_importance.head(10)
-            for idx, row in top_features.iterrows():
-                feature_name = row['variable']
-                importance = row['relative_importance']
-                scaled_importance = row['scaled_importance']
-                
-                # Create visual bar
-                bar_length = int(scaled_importance * 20)  # Scale to 20 chars max
-                bar = "█" * bar_length + "░" * (20 - bar_length)
-                
-                lines.extend([
-                    f"   {idx+1:2d}. **{feature_name}**",
-                    f"       {bar} {importance:.4f}",
-                    ""
-                ])
-        
-        # Model Performance Breakdown
-        lines.extend([
-            "🎯 **MODEL PERFORMANCE BREAKDOWN**:",
-            f"   • **Cross-Validation Score**: {model_session.performance_metrics.get('auc', 'N/A')}",
-            f"   • **Training Time**: {model_session.performance_metrics.get('training_time', 'N/A')} seconds",
-            f"   • **Algorithm**: {extract_algorithm_name(model_id)}",
-            "",
-            "💡 **Key Insights**:",
-            f"   • This model considers **{len(feature_importance)}** features in total",
-            f"   • The top 5 features account for most of the prediction power",
-            f"   • Model performs best when these key features have good data quality",
-            ""
-        ])
-        
-        return lines
-        
-    except Exception as e:
-        logger.error(f"Model interpretation failed: {e}")
-        return [f"❌ **Interpretation Failed**: {str(e)}"]
-```
-
-### 4.2 Automated Model Validation
-
-**Enhancement**: Add holdout testing and validation:
-```python
-def perform_model_validation(self, model_id: str, session_memory: MLAgentSessionMemory) -> List[str]:
-    """Perform comprehensive model validation on holdout data."""
-    
-    model_session = session_memory.get_trained_model(model_id)
-    if not model_session:
-        return [f"❌ **Model Not Found**: No model with ID '{model_id}' found in this session."]
-    
-    try:
-        import h2o
-        if not h2o.cluster():
-            h2o.init()
-            
-        model = h2o.load_model(model_session.model_path)
-        
-        # Load validation/test data (if available)
-        # This would need to be implemented based on your data splitting strategy
-        test_data = self.get_holdout_data(model_session.dataset_used)
-        
-        if test_data is not None:
-            # Make predictions on holdout data
-            predictions = model.predict(test_data)
-            performance = model.model_performance(test_data)
-            
-            lines = [
-                "🧪 **MODEL VALIDATION RESULTS**",
-                "=" * 45,
-                "",
-                f"🎯 **Model**: {model_id}",
-                f"📊 **Test Dataset Size**: {test_data.nrows} samples",
-                "",
-                "📊 **Holdout Performance**:",
-                f"   • **AUC**: {performance.auc()[0][0]:.4f}",
-                f"   • **Accuracy**: {performance.accuracy()[0][0]:.4f}",
-                f"   • **Precision**: {performance.precision()[0][0]:.4f}",
-                f"   • **Recall**: {performance.recall()[0][0]:.4f}",
-                "",
-                "✅ **Validation Status**:",
-            ]
-            
-            # Determine validation status
-            training_auc = model_session.performance_metrics.get('auc', 0)
-            test_auc = performance.auc()[0][0]
-            
-            if abs(training_auc - test_auc) < 0.05:
-                lines.append("   • ✅ **Good**: Model generalizes well (minimal overfitting)")
-            elif test_auc < training_auc - 0.1:
-                lines.append("   • ⚠️ **Caution**: Possible overfitting detected")
-            else:
-                lines.append("   • 🎯 **Excellent**: Test performance matches training")
-            
-            lines.extend([
-                "",
-                "💡 **Recommendations**:",
-                "   • Model is ready for production use" if abs(training_auc - test_auc) < 0.05 else "   • Consider regularization or more training data",
-                ""
-            ])
-            
-            return lines
         else:
-            return [
-                "⚠️ **Validation Data Not Available**",
-                "To perform validation, ensure holdout data is available for testing."
-            ]
+            # Default to best model
+            return self.session_memory.get_best_model(session_id, "auc")
+```
+
+#### **uAgent Integration**
+
+### **Remove Hardcoded Patterns, Add Structured Intent Recognition**
+```python
+# In src/agents/uagent_fetch_ai/data_analysis_uagent.py
+
+class DataAnalysisUAgent:
+    def __init__(self):
+        # ... existing initialization ...
+        
+        # NEW: Session-aware components
+        self.session_intent_parser = SessionAwareIntentParser()
+        self.session_memory = SessionMemoryManager()
+        self.data_analysis_agent = DataAnalysisAgent(enable_session_memory=True)
+    
+    async def handle_user_message(self, ctx: Context, sender: str, message: str):
+        """Handle user message with structured intent recognition"""
+        
+        try:
+            # Extract session ID from context
+            session_id = self._get_session_id(ctx, sender)
             
-    except Exception as e:
-        logger.error(f"Model validation failed: {e}")
-        return [f"❌ **Validation Failed**: {str(e)}"]
-```
-
-### 4.3 Multi-Model Comparison
-
-**Enhancement**: Add model comparison within session:
-```python
-def compare_session_models(self, session_memory: MLAgentSessionMemory) -> List[str]:
-    """Compare all trained models in the current session."""
-    
-    trained_models = session_memory.list_trained_models()
-    
-    if len(trained_models) < 2:
-        return [
-            "📊 **MODEL COMPARISON**",
-            "⚠️ Need at least 2 models in this session to perform comparison.",
-            f"Currently have: {len(trained_models)} model(s)"
-        ]
-    
-    lines = [
-        "📊 **SESSION MODEL COMPARISON**",
-        "=" * 45,
-        "",
-        f"🎯 **Comparing {len(trained_models)} Models**:",
-        ""
-    ]
-    
-    # Sort models by performance
-    sorted_models = sorted(trained_models, 
-                          key=lambda m: m.performance_metrics.get('auc', 0), 
-                          reverse=True)
-    
-    for i, model in enumerate(sorted_models, 1):
-        performance = model.performance_metrics or {}
-        auc = performance.get('auc', 0)
-        accuracy = performance.get('accuracy', 0)
-        
-        # Add ranking emoji
-        rank_emoji = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
-        
-        lines.extend([
-            f"{rank_emoji} **{model.model_id}**",
-            f"   • Type: {model.model_type}",
-            f"   • AUC: {auc:.4f}",
-            f"   • Accuracy: {accuracy:.4f}",
-            f"   • Training Time: {model.training_timestamp}",
-            ""
-        ])
-    
-    # Add recommendations
-    best_model = sorted_models[0]
-    lines.extend([
-        "🎯 **RECOMMENDATION**:",
-        f"   • **Best Model**: {best_model.model_id}",
-        f"   • **Why**: Highest AUC score ({best_model.performance_metrics.get('auc', 0):.4f})",
-        f"   • **Use This For**: Predictions and production deployment",
-        "",
-        "💡 **Next Steps**:",
-        f"   • Try: 'Predict with model {best_model.model_id} using [your data]'",
-        f"   • Or: 'Download model {best_model.model_id}' to get the trained model",
-        ""
-    ])
-    
-    return lines
-```
-
-### 4.4 Smart Prediction Guidance
-
-**Enhancement**: Add intelligent prediction assistance:
-```python
-def provide_prediction_guidance(self, model_id: str, session_memory: MLAgentSessionMemory) -> List[str]:
-    """Provide smart guidance for making predictions with a specific model."""
-    
-    model_session = session_memory.get_trained_model(model_id)
-    if not model_session:
-        return [f"❌ **Model Not Found**: No model with ID '{model_id}' found in this session."]
-    
-    lines = [
-        "🎯 **PREDICTION GUIDANCE**",
-        "=" * 35,
-        "",
-        f"🤖 **Model**: {model_id}",
-        f"📊 **Target**: {model_session.target_column}",
-        ""
-    ]
-    
-    if model_session.feature_columns:
-        lines.extend([
-            "📋 **Required Input Features**:",
-            ""
-        ])
-        
-        # Group features by likely type
-        numerical_features = []
-        categorical_features = []
-        
-        for feature in model_session.feature_columns[:10]:  # Show top 10
-            # This is a simplification - in practice, you'd track feature types
-            if any(keyword in feature.lower() for keyword in ['age', 'income', 'amount', 'score', 'count', 'rate']):
-                numerical_features.append(feature)
+            # Use structured intent recognition instead of regex patterns
+            intent = self.session_intent_parser.parse_intent_with_session(
+                user_request=message,
+                csv_url="",  # Will be extracted by intent parser
+                session_id=session_id
+            )
+            
+            # Route based on structured intent
+            if intent.prediction_intent and intent.prediction_intent.is_prediction_request:
+                await self._handle_prediction_request(ctx, intent, session_id)
+            
+            elif intent.is_multi_intent_request:
+                await self._handle_multi_intent_request(ctx, intent, session_id)
+            
             else:
-                categorical_features.append(feature)
+                await self._handle_training_request(ctx, intent, session_id)
         
-        if numerical_features:
-            lines.append("   **Numerical Features** (provide numbers):")
-            for feature in numerical_features:
-                lines.append(f"     • {feature}")
-            lines.append("")
-        
-        if categorical_features:
-            lines.append("   **Categorical Features** (provide text/categories):")
-            for feature in categorical_features:
-                lines.append(f"     • {feature}")
-            lines.append("")
-        
-        lines.extend([
-            "💡 **Example Prediction Request**:",
-            f"   'Predict with model {model_id} using:",
-            f"    {numerical_features[0] if numerical_features else 'feature1'}=25,",
-            f"    {numerical_features[1] if len(numerical_features) > 1 else 'feature2'}=50000'",
-            "",
-            "🔄 **Batch Predictions**:",
-            "   You can also upload a CSV file for batch predictions!",
-            ""
-        ])
+        except Exception as e:
+            await ctx.send(sender, f"Sorry, I encountered an error: {str(e)}")
     
-    return lines
+    async def _handle_prediction_request(
+        self,
+        ctx: Context,
+        intent: EnhancedWorkflowIntent,
+        session_id: str
+    ):
+        """Handle prediction request with session-aware model selection"""
+        
+        prediction_intent = intent.prediction_intent
+        
+        # Check if models are available
+        available_models = self.session_memory.get_available_models(session_id)
+        
+        if not available_models:
+            await ctx.send(
+                ctx.sender,
+                "🤖 I don't have any trained models in our conversation yet. "
+                "Please share a dataset and ask me to train a model first!"
+            )
+            return
+        
+        # Check if user provided input data
+        if not prediction_intent.input_data_provided:
+            # Guide user on providing input data
+            model_info = await self.session_memory.load_model(session_id, available_models[0]["model_id"])
+            await self._provide_input_guidance(ctx, model_info)
+            return
+        
+        # Perform prediction
+        try:
+            result = await self.data_analysis_agent.analyze_with_session(
+                csv_url="",
+                user_request=intent.key_requirements[0] if intent.key_requirements else "prediction",
+                session_id=session_id
+            )
+            
+            # Format prediction result for user
+            formatted_result = self._format_prediction_result(result)
+            await ctx.send(ctx.sender, formatted_result)
+            
+        except Exception as e:
+            await ctx.send(ctx.sender, f"Prediction failed: {str(e)}")
+    
+    def _format_prediction_result(self, result: DataAnalysisResult) -> str:
+        """Format prediction result for user display"""
+        
+        # Extract prediction information
+        prediction_info = result.agent_results[0] if result.agent_results else None
+        
+        if not prediction_info:
+            return "❌ Prediction failed - no results available"
+        
+        # Format prediction output
+        formatted_output = "🎯 **PREDICTION RESULT**\n\n"
+        
+        # Add prediction value
+        formatted_output += f"📊 **Predicted Value:** {prediction_info.prediction}\n"
+        
+        # Add confidence if available
+        if hasattr(prediction_info, 'prediction_confidence'):
+            formatted_output += f"🎯 **Confidence:** {prediction_info.prediction_confidence:.2%}\n"
+        
+        # Add model information
+        formatted_output += f"🤖 **Model Used:** {prediction_info.model_type}\n"
+        
+        # Add explanation
+        if hasattr(prediction_info, 'explanation_text'):
+            formatted_output += f"\n💡 **Explanation:** {prediction_info.explanation_text}\n"
+        
+        return formatted_output
 ```
+
+#### **Testing and Validation**
+
+### **Integration Tests**
+```python
+# In tests/test_session_aware_intent_parsing.py
+
+class TestSessionAwareIntentParsing:
+    
+    def test_prediction_intent_recognition(self):
+        """Test that prediction intent is correctly recognized"""
+        
+        parser = SessionAwareIntentParser()
+        
+        # Test pure prediction request
+        intent = parser.parse_intent_with_session(
+            user_request="Can you predict the price for a house with 3 bedrooms, 2 bathrooms?",
+            csv_url="",
+            session_id="test_session_1"
+        )
+        
+        assert intent.prediction_intent.is_prediction_request == True
+        assert intent.prediction_intent.is_single_prediction == True
+        assert intent.prediction_intent.input_data_provided != {}
+        assert intent.prediction_intent.prediction_intent_confidence > 0.7
+    
+    def test_multi_intent_recognition(self):
+        """Test that multi-intent requests are handled correctly"""
+        
+        parser = SessionAwareIntentParser()
+        
+        intent = parser.parse_intent_with_session(
+            user_request="Train a model on this data and then predict the outcome for new customer",
+            csv_url="https://example.com/data.csv",
+            session_id="test_session_2"
+        )
+        
+        assert intent.is_multi_intent_request == True
+        assert intent.needs_ml_modeling == True
+        assert intent.prediction_intent.is_prediction_request == True
+    
+    def test_session_context_integration(self):
+        """Test that session context influences intent parsing"""
+        
+        parser = SessionAwareIntentParser()
+        
+        # Add models to session
+        parser.update_session_models(
+            session_id="test_session_3",
+            model_id="model_1",
+            model_metadata={"model_type": "RandomForest", "performance": {"auc": 0.85}}
+        )
+        
+        # Test that same request is interpreted differently with available models
+        intent = parser.parse_intent_with_session(
+            user_request="What would be the outcome for this customer?",
+            csv_url="",
+            session_id="test_session_3"
+        )
+        
+        # Should prioritize prediction since models are available
+        assert intent.prediction_intent.is_prediction_request == True
+        assert intent.needs_ml_modeling == False
+```
+
+#### **Performance Optimizations**
+
+### **Efficient Session Memory**
+- Use Redis for production session storage
+- Implement model cache eviction policies
+- Optimize intent parsing with caching
+- Add async model loading
+
+### **Structured Output Validation**
+- Use Pydantic validation for all schemas
+- Add retry logic for parsing failures
+- Implement fallback parsing strategies
+- Monitor parsing performance
+
+## **3.8 Implementation Priority and Validation**
+
+### **Implementation Steps (Week 2-3)**
+
+**Step 1: Schema Enhancement** (Day 1-2)
+- Add new schemas to `src/schemas/data_analysis_schemas.py`
+- Extend existing `WorkflowIntent` to `EnhancedWorkflowIntent`
+- Add validation tests for all new schemas
+
+**Step 2: Intent Parser Enhancement** (Day 3-4)
+- Create `SessionAwareIntentParser` in `src/parsers/intent_parser.py`
+- Integrate with existing `DataAnalysisIntentParser` class
+- Add session context tracking and model awareness
+
+**Step 3: Session Memory Integration** (Day 5-6)
+- Implement `SessionMemoryManager` in `src/memory/session_memory.py`
+- Add model storage and retrieval functionality
+- Integrate with H2O ML agent for model persistence
+
+**Step 4: Data Analysis Agent Updates** (Day 7-8)
+- Enhance `DataAnalysisAgent` with session awareness
+- Add prediction request handling capabilities
+- Implement multi-intent request routing
+
+**Step 5: uAgent Integration** (Day 9-10)
+- Remove hardcoded regex patterns from `data_analysis_uagent.py`
+- Integrate structured intent recognition
+- Add prediction interface and user guidance
+
+### **Critical Implementation Details**
+
+#### **Error Handling and Edge Cases**
+```python
+# In SessionAwareIntentParser
+
+def parse_intent_with_session(self, ...):
+    """Enhanced parsing with comprehensive error handling"""
+    
+    try:
+        # Validate session context
+        if not session_id or len(session_id) < 8:
+            session_id = f"session_{uuid.uuid4().hex[:8]}"
+        
+        # Handle empty or invalid user requests
+        if not user_request or len(user_request.strip()) < 5:
+            return self._create_minimal_intent_fallback()
+        
+        # Validate CSV URL if provided
+        if csv_url and not self._is_valid_csv_url(csv_url):
+            return self._create_url_error_intent(csv_url)
+        
+        # Parse with structured output
+        result = self.enhanced_chain.invoke(enhanced_input)
+        
+        # Validate result completeness
+        if result.intent_confidence < 0.3:
+            logger.warning(f"Low confidence intent parsing: {result.intent_confidence}")
+            return self._enhance_low_confidence_result(result, user_request)
+        
+        return result
+        
+    except PydanticValidationError as e:
+        # Handle schema validation failures
+        logger.error(f"Schema validation failed: {e}")
+        return self._create_validation_error_fallback(user_request)
+    
+    except OpenAIAPIError as e:
+        # Handle LLM API failures
+        logger.error(f"LLM API failed: {e}")
+        return self._create_api_error_fallback(user_request)
+    
+    except Exception as e:
+        # Handle unexpected errors
+        logger.error(f"Unexpected error in intent parsing: {e}")
+        return self._create_generic_error_fallback(user_request)
+
+def _create_minimal_intent_fallback(self) -> EnhancedWorkflowIntent:
+    """Create minimal valid intent for edge cases"""
+    return EnhancedWorkflowIntent(
+        needs_data_cleaning=False,
+        needs_feature_engineering=False,
+        needs_ml_modeling=False,
+        data_quality_focus=False,
+        exploratory_analysis=True,  # Safe default
+        prediction_focus=False,
+        statistical_analysis=False,
+        key_requirements=["User provided minimal input"],
+        complexity_level="simple",
+        intent_confidence=0.1,
+        is_multi_intent_request=False,
+        primary_intent="exploration",
+        session_context_available=False
+    )
+```
+
+#### **Session Context Management Best Practices**
+```python
+# In SessionMemoryManager
+
+class SessionMemoryManager:
+    
+    def __init__(self, storage_backend: str = "memory", max_session_age_hours: int = 24):
+        """Initialize with session cleanup policies"""
+        self.max_session_age_hours = max_session_age_hours
+        self.cleanup_interval_minutes = 60
+        
+        # Start automatic cleanup
+        self._start_session_cleanup_task()
+    
+    async def _cleanup_expired_sessions(self):
+        """Remove expired sessions to prevent memory leaks"""
+        current_time = datetime.now()
+        expired_sessions = []
+        
+        for session_id, session_data in self.sessions.items():
+            created_at = datetime.fromisoformat(session_data.get("created_at", ""))
+            age_hours = (current_time - created_at).total_seconds() / 3600
+            
+            if age_hours > self.max_session_age_hours:
+                expired_sessions.append(session_id)
+        
+        for session_id in expired_sessions:
+            await self._cleanup_session_models(session_id)
+            del self.sessions[session_id]
+            logger.info(f"Cleaned up expired session: {session_id}")
+    
+    async def _cleanup_session_models(self, session_id: str):
+        """Clean up model files for a session"""
+        try:
+            session_path = self.model_storage_path / session_id
+            if session_path.exists():
+                shutil.rmtree(session_path)
+                logger.info(f"Cleaned up model files for session: {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to cleanup model files for {session_id}: {e}")
+```
+
+#### **Advanced Prediction Context Recognition**
+```python
+# Enhanced prediction intent examples
+
+PREDICTION_INTENT_EXAMPLES = [
+    # Single prediction examples
+    {
+        "user_input": "What would be the churn probability for a customer with monthly charges of $65 and 24 months tenure?",
+        "expected_intent": {
+            "is_prediction_request": True,
+            "is_single_prediction": True,
+            "input_data_provided": {"monthly_charges": 65, "tenure": 24},
+            "input_data_format": "individual_values"
+        }
+    },
+    
+    # Batch prediction examples
+    {
+        "user_input": "Can you predict churn for all customers in this new CSV file?",
+        "expected_intent": {
+            "is_prediction_request": True,
+            "is_batch_prediction": True,
+            "input_data_format": "csv_reference"
+        }
+    },
+    
+    # Model comparison requests
+    {
+        "user_input": "Compare predictions from the Random Forest vs the best AutoML model",
+        "expected_intent": {
+            "is_prediction_request": True,
+            "use_best_model": False,
+            "needs_model_explanation": True
+        }
+    },
+    
+    # Input guidance requests
+    {
+        "user_input": "I want to make a prediction but I'm not sure what data I need to provide",
+        "expected_intent": {
+            "is_prediction_request": True,
+            "needs_input_guidance": True,
+            "input_data_format": "none"
+        }
+    }
+]
+```
+
+## **3.9 Key Benefits of This Approach**
+
+1. **🎯 Sophisticated Intent Recognition**: Uses LangChain's `with_structured_output()` instead of regex patterns
+2. **🧠 Session Context Awareness**: Considers available models when parsing intent
+3. **📊 Multi-Intent Handling**: Handles complex requests with both training and prediction
+4. **🔄 Backward Compatibility**: Extends existing schemas without breaking changes
+5. **⚡ Performance Optimized**: Efficient session memory and model caching
+6. **🎨 Clean Architecture**: Follows established patterns in the codebase
+7. **🛡️ Robust Error Handling**: Comprehensive edge case management and fallbacks
+8. **🔍 Advanced Context Recognition**: Sophisticated prediction intent detection with examples
+9. **🧹 Automatic Cleanup**: Session management with memory leak prevention
+10. **📝 Comprehensive Validation**: Pydantic schema validation with detailed error messages
+
+## **3.10 Expected User Experience Transformation**
+
+**Before (Hardcoded Regex):**
+```
+User: "Can you predict the price for a 3-bedroom house?"
+Agent: "Sorry, I don't understand that request."
+```
+
+**After (Structured Intent Recognition):**
+```
+User: "Can you predict the price for a 3-bedroom house?"
+Agent: "🤖 I understand you want to make a prediction! 
+
+I have 3 trained models available:
+🥇 Best Model: Random Forest (AUC: 0.89)
+🕐 Latest Model: AutoML_20241222_143022 (AUC: 0.87)
+
+For house price prediction, I need:
+• Number of bedrooms ✅ (3 - provided)  
+• Number of bathrooms
+• Square footage
+• Location/ZIP code
+
+Could you provide the missing details?"
+```
+
+This approach transforms Phase 3 from a hardcoded regex system into a sophisticated **LangChain structured output system** that intelligently recognizes user intent using the same patterns already established in the codebase.
 
 ---
 
@@ -1212,7 +1634,7 @@ def provide_prediction_guidance(self, model_id: str, session_memory: MLAgentSess
 - [ ] **2.4**: Test model download workflow end-to-end
 - [ ] **2.5**: Handle large model files and compression
 
-### Phase 3: Session Memory + Prediction Interface 🧠
+### Phase 3: Session Memory + Structured Prediction Intent Recognition 🧠
 - [ ] **3.1**: Implement `TrainedModelSession` and prediction schemas
 - [ ] **3.2**: Add `MLAgentSessionMemory` class with persistence
 - [ ] **3.3**: Implement intent recognition for prediction requests
