@@ -222,8 +222,9 @@ class FeatureEngineeringMetrics(BaseModel):
 
 
 class MLModelingMetrics(BaseModel):
-    """Metrics from ML modeling operations"""
+    """Comprehensive ML modeling metrics from H2O AutoML."""
     
+    # Core Model Metrics
     models_trained: int = Field(description="Number of models trained")
     best_model_type: Optional[str] = Field(description="Type of the best performing model")
     best_model_id: Optional[str] = Field(description="ID of the best performing model")
@@ -244,6 +245,18 @@ class MLModelingMetrics(BaseModel):
     # Experiment Tracking
     mlflow_experiment_id: Optional[str] = Field(description="MLflow experiment ID if tracking enabled")
     mlflow_run_id: Optional[str] = Field(description="MLflow run ID if tracking enabled")
+    
+    # NEW: Enhanced fields for Phase 1 - Rich ML Results Display
+    model_path: Optional[str] = Field(default=None, description="Path to saved model file")
+    leaderboard: Optional[List[Dict[str, Any]]] = Field(default=None, description="H2O AutoML leaderboard with all trained models")
+    top_model_metrics: Optional[Dict[str, Any]] = Field(default=None, description="Detailed metrics for the top performing model")
+    total_models_trained: Optional[int] = Field(default=None, description="Total number of models trained in AutoML")
+    training_runtime: Optional[float] = Field(default=None, description="Total training runtime in seconds")
+    generated_code: Optional[str] = Field(default=None, description="AI-generated H2O training code")
+    recommended_steps: Optional[str] = Field(default=None, description="AI-recommended ML methodology steps")
+    workflow_summary: Optional[str] = Field(default=None, description="Summary of the ML workflow executed")
+    model_architecture: Optional[str] = Field(default=None, description="Architecture of the best model")
+    enhanced_feature_importance: Optional[List[Dict[str, Any]]] = Field(default=None, description="Enhanced feature importance analysis results")
 
 
 class AgentExecutionResult(BaseModel):
