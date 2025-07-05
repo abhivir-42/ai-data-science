@@ -3138,3 +3138,159 @@ This comprehensive implementation plan transforms the ML agent from a basic mode
 **Expected Impact**: This enhancement will transform user perception from "the ML agent just trains models" to "this is a complete ML platform that provides professional-grade machine learning capabilities" - delivering genuine business value through the Fetch.ai ecosystem.
 
 **Timeline**: 3-4 weeks for complete implementation with proper testing and refinement. 
+
+---
+
+## Phase 2: Enhanced Output Formatting & User Experience
+
+### **🎯 Objective**
+Improve the formatted output display to eliminate redundancy, improve readability, and provide a better user experience.
+
+### **📋 Current Issues Identified**
+
+1. **Non-functional chunked data delivery instructions** - showing instructions that don't work
+2. **Poor column information formatting** - cramped single-line display
+3. **Misplaced workflow summary** - appears in middle instead of top
+4. **Confusing ML steps messaging** - unclear if steps were followed or recommended
+5. **Repetitive generated files section** - same files displayed multiple times
+6. **Inconsistent section ordering** - logical flow is disrupted
+
+### **✅ Improvement Tasks**
+
+#### **Task 1: Fix Data Delivery Strategy**
+- **Problem**: Showing chunked data instructions that don't work in uAgent interface
+- **Solution**: Replace with direct CSV content display or remove misleading instructions
+- **Implementation**: 
+  - For files 50-200KB: Show full preview with better formatting
+  - Remove non-functional chunking instructions
+  - Add clear "Complete data shown above" message
+
+#### **Task 2: Improve Column Information Display**
+- **Problem**: Column info cramped on single lines
+- **Solution**: Format as clean table with proper spacing
+- **Implementation**:
+  ```
+  📋 **COLUMN INFORMATION**:
+     Column Name    | Data Type | Nulls | Unique | Sample Values
+     -------------- | --------- | ----- | ------ | -------------
+     PassengerId    | int64     | 0     | 838    | 1, 2, 3, ...
+     Survived       | int64     | 0     | 2      | 0, 1
+     Sex            | object    | 0     | 2      | male, female
+  ```
+
+#### **Task 3: Reorganize Section Flow**
+- **Problem**: Workflow summary appears in wrong place
+- **Solution**: Restructure logical flow
+- **New Order**:
+  1. Analysis header & summary
+  2. **Workflow execution summary** (moved to top)
+  3. Data transformation results
+  4. Individual agent results (cleaning, feature engineering, ML)
+  5. Performance metrics
+  6. Generated files (deduplicated)
+  7. Insights & recommendations
+
+#### **Task 4: Clarify ML Steps Messaging**
+- **Problem**: "Recommended ML Steps" unclear
+- **Solution**: Change to "ML Methodology Applied" or "Steps Executed by ML Agent"
+- **Implementation**: 
+  ```
+  📋 **ML METHODOLOGY EXECUTED**:
+     The following approach was automatically applied by the ML agent:
+     [steps content]
+  ```
+
+#### **Task 5: Deduplicate Generated Files**
+- **Problem**: Same files shown multiple times
+- **Solution**: Single consolidated section with unique files
+- **Implementation**: 
+  - Track files already displayed
+  - Show each file only once
+  - Group by file type (CSV, logs, models)
+
+#### **Task 6: Improve Data Preview Strategy**
+- **Problem**: Inconsistent data preview approach
+- **Solution**: Standardized data display based on size
+- **Strategy**:
+  - **< 30KB**: Full CSV content
+  - **30-100KB**: First 20 rows + summary
+  - **> 100KB**: First 10 rows + download links
+
+#### **Task 7: Add Visual Hierarchy**
+- **Problem**: Sections blend together
+- **Solution**: Better visual separation
+- **Implementation**:
+  - Consistent separator usage
+  - Clear section headers
+  - Logical spacing
+
+### **🔧 Implementation Priority**
+
+**High Priority (Immediate)**:
+1. Remove non-functional chunked data instructions
+2. Move workflow summary to top
+3. Fix column information formatting
+4. Clarify ML steps messaging
+
+**Medium Priority (Next)**:
+5. Deduplicate generated files section
+6. Improve data preview strategy
+7. Add visual hierarchy
+
+### **📊 Success Metrics**
+
+- **Readability**: Column information formatted as clean table
+- **Accuracy**: No misleading instructions shown
+- **Flow**: Logical section ordering maintained
+- **Brevity**: No duplicate content displayed
+- **Clarity**: Clear distinction between recommendations and actions taken
+
+### **🧪 Testing Plan**
+
+1. **Test different file sizes** (small, medium, large datasets)
+2. **Test different agent combinations** (cleaning only, ML only, full workflow)
+3. **Test failed agent scenarios** (ensure clean display)
+4. **Test edge cases** (empty datasets, single column data)
+
+### **💡 Additional Enhancements**
+
+- **Add execution timeline** showing when each agent started/completed
+- **Show data quality improvements** with before/after metrics
+- **Add model performance visualization** (if feasible in text format)
+- **Include estimated processing cost** (time, resources)
+
+---
+
+## Implementation Details
+
+### **File Changes Required**
+
+1. **`data_analysis_uagent.py`** - Main formatting function updates
+2. **`format_analysis_result()`** - Complete restructuring
+3. **Column formatting functions** - New table display logic
+4. **File deduplication logic** - Track displayed files
+
+### **Code Structure Changes**
+
+```python
+def format_analysis_result(result) -> str:
+    """Enhanced formatting with improved structure"""
+    
+    # 1. Header & Summary (unchanged)
+    # 2. Workflow Summary (moved to top)
+    # 3. Data Transformation Results
+    # 4. Individual Agent Results (deduplicated)
+    # 5. Performance Metrics
+    # 6. Generated Files (single section)
+    # 7. Insights & Recommendations
+    
+    return format_with_improved_structure(sections)
+```
+
+### **Timeline**
+
+- **Phase 2a** (Immediate): Fix high-priority issues
+- **Phase 2b** (Next): Implement medium-priority improvements
+- **Phase 2c** (Future): Add enhancement features
+
+This plan will significantly improve the user experience and make the output more professional and readable.

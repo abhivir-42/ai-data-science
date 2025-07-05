@@ -308,13 +308,17 @@ Based on this information, analyze the user's request and provide a structured w
                 ("system", """You are a dataset URL extraction expert. Your task is to analyze user text and extract CSV dataset URLs.
 
 EXTRACTION RULES:
-1. Look for explicit HTTP/HTTPS URLs that end with .csv
-2. Only extract URLs that clearly point to CSV files
-3. Do NOT invent or generate URLs that aren't explicitly mentioned
-4. If no URL is found, set extraction_method to "none_found" and provide an empty string for extracted_csv_url
-5. Be conservative - only extract URLs you are confident about
+1. Look for ANY HTTP/HTTPS URLs in the text, even if they don't end with .csv
+2. Common CSV hosting patterns include:
+   - GitHub raw URLs (github.com, raw.githubusercontent.com)
+   - Seaborn data URLs (raw.githubusercontent.com/mwaskom/seaborn-data)
+   - Direct CSV file URLs ending in .csv
+   - Data repository URLs that serve CSV files
+3. If you find a URL that likely serves CSV data, extract it regardless of file extension
+4. Set high confidence (0.8-1.0) for clear URLs like "https://raw.githubusercontent.com/.../file.csv"
+5. Be INCLUSIVE - extract URLs that could be CSV data sources
 
-IMPORTANT: Do not create or infer URLs from dataset names. Only extract explicit URLs that are mentioned in the text."""),
+IMPORTANT: Look carefully for URLs in the text. URLs from GitHub, data repositories, or raw file servers are likely valid even without .csv extension."""),
                 ("user", """TEXT TO ANALYZE: {text_input}
 
 Extract the CSV dataset URL from this text. If no explicit CSV URL is found, indicate that none was found.

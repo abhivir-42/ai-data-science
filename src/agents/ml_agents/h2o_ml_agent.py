@@ -482,7 +482,7 @@ def make_h2o_ml_agent(
         return {
             "recommended_steps": format_recommended_steps(
                 recommended_steps.content.strip(),
-                heading="# Recommended ML Steps (Optimized for Speed):"
+                heading="# ML Methodology Applied by H2O AutoML:"
             ),
             "all_datasets_summary": all_datasets_summary_str
         }

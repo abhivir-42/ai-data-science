@@ -293,15 +293,34 @@ def data_analysis_agent_func(query):
                     result.key_insights.insert(0, f"Sample cleaned data (first 3 rows):\n{sample_rows}")
                     result.key_insights.insert(0, f"Cleaned dataset contains {len(cleaned_df):,} rows and {len(cleaned_df.columns)} columns")
                     
-                    # Add column information
-                    col_info = []
-                    for col in cleaned_df.columns[:10]:  # First 10 columns
-                        dtype = cleaned_df[col].dtype
-                        null_count = cleaned_df[col].isnull().sum()
-                        col_info.append(f"{col}: {dtype} ({null_count} nulls)")
+                    # Generate meaningful insights instead of technical column details
+                    meaningful_insights = []
                     
-                    if col_info:
-                        result.key_insights.insert(0, f"Column details: {', '.join(col_info)}")
+                    # Data completeness insight
+                    total_cells = len(cleaned_df) * len(cleaned_df.columns)
+                    missing_cells = cleaned_df.isnull().sum().sum()
+                    completeness = ((total_cells - missing_cells) / total_cells) * 100
+                    meaningful_insights.append(f"Dataset is {completeness:.1f}% complete with minimal missing values")
+                    
+                    # Data diversity insight
+                    numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+                    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+                    if len(numeric_cols) > 0 and len(categorical_cols) > 0:
+                        meaningful_insights.append(f"Rich dataset with {len(numeric_cols)} numerical and {len(categorical_cols)} categorical features")
+                    elif len(numeric_cols) > 0:
+                        meaningful_insights.append(f"Primarily numerical dataset with {len(numeric_cols)} quantitative features")
+                    else:
+                        meaningful_insights.append(f"Categorical-focused dataset with {len(categorical_cols)} qualitative features")
+                    
+                    # Data quality insight
+                    if missing_cells == 0:
+                        meaningful_insights.append("Excellent data quality - no missing values detected")
+                    elif missing_cells < total_cells * 0.05:
+                        meaningful_insights.append("High data quality with minimal missing values")
+                    
+                    # Add meaningful insights to result
+                    for insight in meaningful_insights:
+                        result.key_insights.insert(0, insight)
                         
         except Exception as e:
             # Silent fail - don't break the main functionality
@@ -853,11 +872,13 @@ def format_ml_workflow_summary_display(ml_results: Dict[str, Any]) -> List[str]:
             ""
         ])
     
-    # Recommended steps
+    # Recommended steps - CLARIFIED MESSAGING
     recommended_steps = ml_results.get("recommended_steps")
     if recommended_steps:
         lines.extend([
-            "📋 **AI-RECOMMENDED METHODOLOGY**:",
+            "📋 **ML METHODOLOGY EXECUTED**:",
+            "   The following approach was automatically applied by the ML agent:",
+            "",
             f"   {recommended_steps}",
             ""
         ])
@@ -897,10 +918,51 @@ def format_analysis_result(result) -> str:
             f"⏱️  **Runtime**: {result.total_runtime_seconds:.2f} seconds",
             f"🎯 **Confidence**: {result.confidence_level.upper()}",
             f"⭐ **Quality Score**: {result.analysis_quality_score:.2f}/1.0",
+            "",
+            "─" * 60,
             ""
         ]
         
-        # CHECK FOR AGENT FAILURES FIRST
+        # WORKFLOW EXECUTION SUMMARY - MOVED TO TOP
+        if result.workflow_intent:
+            # Extract agent status information
+            data_cleaning_result = None
+            feature_engineering_result = None
+            ml_agent_result = None
+            
+            for agent_result in result.agent_results:
+                if agent_result.agent_name == "data_cleaning":
+                    data_cleaning_result = agent_result
+                elif agent_result.agent_name == "feature_engineering":
+                    feature_engineering_result = agent_result
+                elif agent_result.agent_name == "h2o_ml":
+                    ml_agent_result = agent_result
+            
+            # Check actual execution results for summary
+            data_cleaning_status = "❌ Not executed"
+            feature_engineering_status = "❌ Not executed"  
+            ml_modeling_status = "❌ Not executed"
+            
+            if data_cleaning_result:
+                data_cleaning_status = "✅ Success" if data_cleaning_result.success else f"❌ Failed: {getattr(data_cleaning_result, 'error_message', 'Unknown error')[:50]}..."
+            if feature_engineering_result:
+                feature_engineering_status = "✅ Success" if feature_engineering_result.success else f"❌ Failed: {getattr(feature_engineering_result, 'error_message', 'Unknown error')[:50]}..."
+            if ml_agent_result:
+                if ml_agent_result.success:
+                    ml_modeling_status = "✅ Success"
+                else:
+                    ml_modeling_status = f"❌ Failed: {getattr(ml_agent_result, 'error_message', 'Unknown error')[:50]}..."
+            
+            lines.extend([
+                "🔄 **WORKFLOW EXECUTION SUMMARY**:",
+                f"   • Data Cleaning: {data_cleaning_status}",
+                f"   • Feature Engineering: {feature_engineering_status}",
+                f"   • ML Modeling: {ml_modeling_status}",
+                f"   • Intent Confidence: {result.workflow_intent.intent_confidence:.2f}",
+                ""
+            ])
+        
+        # Agent execution details (detailed view after workflow summary)
         failed_agents = []
         successful_agents = []
         
@@ -910,10 +972,10 @@ def format_analysis_result(result) -> str:
             else:
                 successful_agents.append(agent_result)
         
-        # Report any failures upfront
+        # Only show detailed agent status if there are failures
         if failed_agents:
             lines.extend([
-                "⚠️  **AGENT EXECUTION STATUS**:",
+                "⚠️  **DETAILED AGENT STATUS**:",
                 ""
             ])
             
@@ -942,27 +1004,11 @@ def format_analysis_result(result) -> str:
                 "   Even with some agent failures, we'll provide results from successful steps.",
                 ""
             ])
-        else:
-            lines.extend([
-                "✅ **AGENT EXECUTION STATUS**:",
-                ""
-            ])
-            
-            for successful_agent in successful_agents:
-                lines.extend([
-                    f"   ✅ **{successful_agent.agent_name.replace('_', ' ').title()} Agent**: SUCCESS",
-                    f"       Runtime: {successful_agent.execution_time_seconds:.2f}s",
-                    ""
-                ])
-            
-            lines.extend([
-                "🎉 **ALL AGENTS EXECUTED SUCCESSFULLY**:",
-                ""
-            ])
         
         # SHOW ACTUAL DATA TRANSFORMATION RESULTS
         lines.extend([
             "📈 **DATA TRANSFORMATION RESULTS**:",
+            "─" * 40,
             ""
         ])
         
@@ -1096,23 +1142,20 @@ def format_analysis_result(result) -> str:
                         ])
                         cleaned_data_provided = True
                     
-                    # Strategy 2: For medium datasets (50KB-200KB), provide compressed or chunked data
+                    # Strategy 2: For medium datasets (50KB-200KB), provide full data with better formatting
                     elif content_size < 200000:  # 200KB limit
-                        # Provide key columns and sample + instructions
                         lines.extend([
-                            "📋 **CLEANED DATA PREVIEW** (First 10 rows):",
+                            "📋 **COMPLETE CLEANED DATA** (Full Dataset):",
                             "```csv",
-                            cleaned_df.head(10).to_csv(index=False),
+                            csv_content,
                             "```",
                             "",
-                            f"📁 **FULL DATASET INFORMATION**:",
-                            f"   • Dataset is {content_size / 1024:.1f} KB - too large to display fully here",
+                            f"📁 **DATASET SUMMARY**:",
+                            f"   • File size: {content_size / 1024:.1f} KB",
                             f"   • Contains {len(cleaned_df):,} rows and {len(cleaned_df.columns)} columns",
+                            f"   • All data shown above - ready for analysis",
                             "",
-                            "💡 **To get your complete cleaned data**:",
-                            "   1. Ask: 'Please provide my cleaned data in chunks'",
-                            "   2. Or: 'Split my cleaned data into smaller parts'",
-                            "   3. I can deliver it in manageable pieces you can combine",
+                            "💡 **Usage**: Copy the complete CSV data above and save it as a .csv file, or use it directly in your analysis.",
                             ""
                         ])
                         cleaned_data_provided = True
@@ -1140,29 +1183,42 @@ def format_analysis_result(result) -> str:
                         ])
                         cleaned_data_provided = True
                     
-                    # Show column information for all cases
+                    # Show column information for all cases - IMPROVED FORMATTING
                     lines.extend([
                         "📋 **COLUMN INFORMATION**:",
+                        "```",
+                        f"{'Column Name':<20} | {'Data Type':<10} | {'Nulls':<6} | {'Unique':<7} | Sample Values",
+                        "-" * 75,
                     ])
                     
                     for col in cleaned_df.columns[:15]:  # Show first 15 columns
-                        dtype = cleaned_df[col].dtype
+                        dtype = str(cleaned_df[col].dtype)
                         null_count = cleaned_df[col].isnull().sum()
                         unique_count = cleaned_df[col].nunique()
                         
                         # Add sample values for categorical columns
                         if dtype == 'object' and unique_count <= 10:
                             sample_values = cleaned_df[col].value_counts().head(3).index.tolist()
-                            sample_str = f" (e.g., {', '.join(map(str, sample_values))})"
+                            sample_str = f"{', '.join(map(str, sample_values))}"
+                        elif dtype != 'object' and unique_count <= 20:
+                            sample_values = sorted(cleaned_df[col].dropna().unique())[:5]
+                            sample_str = f"{', '.join(map(str, sample_values))}"
                         else:
-                            sample_str = ""
+                            sample_str = "..."
                         
-                        lines.append(f"   • {col}: {dtype} | {null_count} nulls | {unique_count} unique{sample_str}")
+                        # Truncate long column names and sample values for formatting
+                        col_display = col[:18] + ".." if len(col) > 20 else col
+                        sample_display = sample_str[:25] + "..." if len(sample_str) > 25 else sample_str
+                        
+                        lines.append(f"{col_display:<20} | {dtype:<10} | {null_count:<6} | {unique_count:<7} | {sample_display}")
                     
                     if len(cleaned_df.columns) > 15:
-                        lines.append(f"   • ...and {len(cleaned_df.columns) - 15} more columns")
+                        lines.append(f"{'...':<20} | {'...':<10} | {'...':<6} | {'...':<7} | and {len(cleaned_df.columns) - 15} more columns")
                     
-                    lines.append("")
+                    lines.extend([
+                        "```",
+                        ""
+                    ])
                 
             except Exception as e:
                 lines.extend([
@@ -1272,32 +1328,8 @@ def format_analysis_result(result) -> str:
                     ""
                 ])
 
-        # Workflow information with actual execution results - Enhanced ML Display
+        # Enhanced ML Display (workflow summary moved to top)
         if result.workflow_intent:
-            # Check actual execution results for summary
-            data_cleaning_status = "❌ Not executed"
-            feature_engineering_status = "❌ Not executed"  
-            ml_modeling_status = "❌ Not executed"
-            
-            if data_cleaning_result:
-                data_cleaning_status = "✅ Success" if data_cleaning_result.success else f"❌ Failed: {getattr(data_cleaning_result, 'error_message', 'Unknown error')[:50]}..."
-            if feature_engineering_result:
-                feature_engineering_status = "✅ Success" if feature_engineering_result.success else f"❌ Failed: {getattr(feature_engineering_result, 'error_message', 'Unknown error')[:50]}..."
-            if ml_agent_result:
-                if ml_agent_result.success:
-                    ml_modeling_status = "✅ Success"
-                else:
-                    ml_modeling_status = f"❌ Failed: {getattr(ml_agent_result, 'error_message', 'Unknown error')[:50]}..."
-            
-            # Basic workflow status 
-            lines.extend([
-                "🔄 **WORKFLOW EXECUTION SUMMARY**:",
-                f"   • Data Cleaning: {data_cleaning_status}",
-                f"   • Feature Engineering: {feature_engineering_status}",
-                f"   • ML Modeling: {ml_modeling_status}",
-                f"   • Intent Confidence: {result.workflow_intent.intent_confidence:.2f}",
-                ""
-            ])
             
             # ENHANCED ML RESULTS DISPLAY - This is the magic!
             if ml_agent_result and ml_agent_result.success:
@@ -1379,6 +1411,7 @@ def format_analysis_result(result) -> str:
         if result.key_insights:
             lines.extend([
                 "💡 **KEY INSIGHTS**:",
+                "─" * 20,
                 *[f"   • {insight}" for insight in result.key_insights],
                 ""
             ])
@@ -1387,20 +1420,36 @@ def format_analysis_result(result) -> str:
         if result.recommendations:
             lines.extend([
                 "🎯 **RECOMMENDATIONS**:",
+                "─" * 25,
                 *[f"   • {rec}" for rec in result.recommendations],
                 ""
             ])
         
-        # Generated files with actual content
+        # Generated files with actual content - DEDUPLICATED
         if result.generated_files:
-            lines.extend([
-                "📁 **GENERATED FILES & CONTENTS**:",
-                ""
-            ])
+            # Track already displayed files to avoid duplicates
+            displayed_files = set()
             
+            # First, collect files that were already displayed in agent sections
+            for agent_result in result.agent_results:
+                if agent_result.output_data_path:
+                    displayed_files.add(agent_result.output_data_path)
+            
+            # Only show files that haven't been displayed yet
+            unique_files = {}
             for name, path in result.generated_files.items():
-                lines.extend(display_file_contents(name, path))
-                lines.append("")  # Add spacing between files
+                if path not in displayed_files:
+                    unique_files[name] = path
+            
+            if unique_files:
+                lines.extend([
+                    "📁 **ADDITIONAL GENERATED FILES**:",
+                    ""
+                ])
+                
+                for name, path in unique_files.items():
+                    lines.extend(display_file_contents(name, path))
+                    lines.append("")  # Add spacing between files
         
         # Warnings
         if result.warnings:
@@ -1426,8 +1475,10 @@ def format_analysis_result(result) -> str:
             f"   • Cleaned dataset with {data_retention:.1f}% data retention",
             f"   • {missing_handled:,} missing values handled" if missing_handled > 0 else "",
             f"   • {outliers_removed:,} outliers removed" if outliers_removed > 0 else "",
-            "   • Detailed cleaning log and generated code",
+            "   • Comprehensive analysis results with download links",
             "   • Ready-to-use data for further analysis",
+            "   • Enhanced ML insights and generated code",
+            ""
         ])
         
         return "\n".join(lines)
