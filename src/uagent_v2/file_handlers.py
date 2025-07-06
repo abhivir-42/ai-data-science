@@ -493,3 +493,266 @@ class FileContentHandler:
             "💡 **Note**: This file type cannot be displayed inline for security reasons.",
             ""
         ] 
+
+
+# Backward compatibility functions (matching original implementation)
+def upload_csv_to_remote_host(file_path: str, file_description: str = "Processed Data") -> Dict[str, Any]:
+    """
+    Upload CSV file to a remote hosting service (backward compatibility).
+    
+    This function maintains compatibility with the original implementation
+    while using the enhanced secure upload functionality.
+    """
+    try:
+        from .config import UAgentConfig
+        config = UAgentConfig.from_env()
+        uploader = SecureFileUploader(config)
+        
+        # Use enhanced secure upload
+        result = uploader.upload_csv_secure(file_path, file_description)
+        
+        # Convert to original format for compatibility
+        if result.get("success"):
+            return {
+                "success": True,
+                "url": result.get("url"),
+                "service": result.get("service", "tmpfiles.org"),
+                "file_id": result.get("file_id", "unknown"),
+                "size_mb": result.get("size_mb", 0),
+                "error": None,
+                "expires": result.get("expires", "60 minutes (auto-delete)")
+            }
+        else:
+            return {
+                "success": False,
+                "error": result.get("error", "Upload failed"),
+                "url": None
+            }
+            
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Upload error: {str(e)}",
+            "url": None
+        }
+
+
+def create_shareable_csv_link(file_path: str, file_name: str, file_description: str = "Processed Data") -> List[str]:
+    """
+    Create a shareable link for a CSV file (backward compatibility).
+    
+    This function maintains compatibility with the original implementation
+    while using enhanced functionality.
+    """
+    lines = []
+    
+    try:
+        # Get file info
+        file_size = os.path.getsize(file_path)
+        file_size_kb = file_size / 1024
+        file_size_mb = file_size / (1024 * 1024)
+        
+        # Read CSV to get basic stats
+        df = pd.read_csv(file_path)
+        
+        lines.extend([
+            f"🔗 **{file_name.replace('_', ' ').title()}** (CSV File - {file_size_kb:.1f} KB):",
+            f"   📊 Dataset: {len(df):,} rows × {len(df.columns)} columns",
+            f"   📅 Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
+            ""
+        ])
+        
+        # Upload to remote host using enhanced functionality
+        upload_result = upload_csv_to_remote_host(file_path, file_description)
+        
+        if upload_result["success"]:
+            lines.extend([
+                "🌐 **SHAREABLE LINK CREATED**:",
+                f"   🔗 **Download URL**: {upload_result['url']}",
+                f"   🏢 **Service**: {upload_result['service']}",
+                f"   📦 **File ID**: {upload_result['file_id']}",
+                f"   📊 **Size**: {upload_result['size_mb']:.2f} MB",
+                f"   ⏰ **Expires**: {upload_result['expires']}",
+                "",
+                "💡 **How to use**:",
+                "   1. Click the URL above to download your processed data",
+                "   2. Save the file with a .csv extension",
+                "   3. Open in Excel, Python, R, or any data analysis tool",
+                "   4. Share the link with colleagues or save for later use",
+                "",
+                "⚠️  **Important**: File auto-deletes after 60 minutes. Download promptly!"
+            ])
+        else:
+            # Fallback: Provide local file info and sample data
+            lines.extend([
+                "❌ **REMOTE HOSTING FAILED**:",
+                f"   Error: {upload_result['error']}",
+                "",
+                "📋 **FALLBACK: CSV DATA PREVIEW**:",
+                ""
+            ])
+            
+            # Show preview of the data
+            if file_size_kb < 100:  # Small file - show more data
+                lines.extend([
+                    f"📊 **Complete CSV Data** ({len(df):,} rows × {len(df.columns)} columns):",
+                    "```csv",
+                    df.to_csv(index=False),
+                    "```",
+                    "",
+                    "💡 **Usage**: Copy the CSV content above and save as .csv file"
+                ])
+            else:  # Large file - show preview
+                lines.extend([
+                    f"📊 **CSV Preview** (First 10 of {len(df):,} rows × {len(df.columns)} columns):",
+                    "```csv",
+                    df.head(10).to_csv(index=False),
+                    "```",
+                    "",
+                    f"📁 **Local file**: {file_path}",
+                    "💡 **To get complete data**: Ask 'Send my cleaned data in chunks'"
+                ])
+        
+    except Exception as e:
+        lines.extend([
+            f"❌ **Error processing file**: {str(e)}",
+            f"📁 **Local file location**: {file_path}"
+        ])
+    
+    return lines
+
+
+def display_file_contents(file_name: str, file_path: str) -> List[str]:
+    """
+    Display the contents of a generated file (backward compatibility).
+    
+    This function maintains compatibility with the original implementation
+    while using enhanced functionality.
+    """
+    file_lines = []
+    
+    try:
+        if not os.path.exists(file_path):
+            file_lines.extend([
+                f"📄 **{file_name.replace('_', ' ').title()}**:",
+                f"   ⚠️ File not found: {file_path}",
+                ""
+            ])
+            return file_lines
+        
+        # Get file size
+        file_size = os.path.getsize(file_path)
+        file_size_kb = file_size / 1024
+        
+        # Determine file type and display strategy
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        if file_ext == '.csv':
+            # Handle CSV files with remote hosting
+            file_lines.extend(create_shareable_csv_link(file_path, file_name, "Processed CSV Data"))
+        
+        elif file_ext == '.txt' or file_ext == '.log':
+            # Handle text/log files
+            file_lines.extend([
+                f"📝 **{file_name.replace('_', ' ').title()}** (Text File - {file_size_kb:.1f} KB):",
+                ""
+            ])
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                if len(content) < 10000:  # Small text file - show full content
+                    file_lines.extend([
+                        "```",
+                        content,
+                        "```"
+                    ])
+                else:  # Large text file - show first part
+                    preview_content = content[:5000] + "\n\n... (truncated for display) ..."
+                    file_lines.extend([
+                        f"📄 **Content Preview** (First 5000 characters of {len(content):,} total):",
+                        "```",
+                        preview_content,
+                        "```",
+                        "",
+                        f"📁 **Full file location**: {file_path}"
+                    ])
+            
+            except Exception as e:
+                file_lines.extend([
+                    f"⚠️ Could not read text file: {str(e)}",
+                    f"📁 File location: {file_path}"
+                ])
+        
+        elif file_ext in ['.py', '.r', '.sql']:
+            # Handle code files
+            file_lines.extend([
+                f"💻 **{file_name.replace('_', ' ').title()}** (Code File - {file_size_kb:.1f} KB):",
+                ""
+            ])
+            
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Determine language for syntax highlighting
+                lang_map = {'.py': 'python', '.r': 'r', '.sql': 'sql'}
+                lang = lang_map.get(file_ext, 'text')
+                
+                if len(content) < 8000:  # Show full code file
+                    file_lines.extend([
+                        f"```{lang}",
+                        content,
+                        "```"
+                    ])
+                else:  # Show preview of large code file
+                    preview_content = content[:4000] + "\n\n# ... (truncated for display) ..."
+                    file_lines.extend([
+                        f"📄 **Code Preview** (First 4000 characters):",
+                        f"```{lang}",
+                        preview_content,
+                        "```",
+                        "",
+                        f"📁 **Full file location**: {file_path}"
+                    ])
+            
+            except Exception as e:
+                file_lines.extend([
+                    f"⚠️ Could not read code file: {str(e)}",
+                    f"📁 File location: {file_path}"
+                ])
+        
+        else:
+            # Handle other file types
+            file_lines.extend([
+                f"📄 **{file_name.replace('_', ' ').title()}** ({file_ext.upper()} File - {file_size_kb:.1f} KB):",
+                f"📁 File location: {file_path}",
+                ""
+            ])
+            
+            # Try to read as text if it's small
+            if file_size_kb < 20:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    file_lines.extend([
+                        "📄 **File Contents**:",
+                        "```",
+                        content,
+                        "```"
+                    ])
+                except:
+                    file_lines.append("⚠️ Binary file - cannot display content as text")
+            else:
+                file_lines.append("📁 File too large to display - check file location above")
+    
+    except Exception as e:
+        file_lines.extend([
+            f"📄 **{file_name.replace('_', ' ').title()}**:",
+            f"   ❌ Error reading file: {str(e)}",
+            f"   📁 File path: {file_path}",
+            ""
+        ])
+    
+    return file_lines 

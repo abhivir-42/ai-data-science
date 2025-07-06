@@ -36,7 +36,7 @@ from .file_handlers import (
 )
 
 __version__ = "2.0.0"
-__author__ = "AI Data Science Team"
+__author__ = "Abhivir Singh"
 __description__ = "Enhanced uAgent implementation with security and performance improvements"
 
 __all__ = [
