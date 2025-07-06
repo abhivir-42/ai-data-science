@@ -76,10 +76,39 @@ Your job is to intelligently determine:
 CRITICAL PARSING RULES:
 - ONLY set needs_data_cleaning=true if the user explicitly mentions cleaning, preprocessing, data quality, missing values, duplicates, or outliers
 - ONLY set needs_feature_engineering=true if the user explicitly mentions features, encoding, transformations, or feature creation
-- ONLY set needs_ml_modeling=true if the user explicitly mentions prediction, modeling, classification, regression, or machine learning
+- ONLY set needs_ml_modeling=true if the user wants to TRAIN/BUILD/CREATE a new model
+- ONLY set needs_prediction=true if user wants to USE an existing model to predict on new data
+- ONLY set needs_model_analysis=true if user asks questions about model performance, feature importance, or model insights
 - Be PRECISE and LITERAL in your interpretation - don't assume additional steps unless explicitly requested
 - If the user only asks for cleaning, do NOT assume they want feature engineering or ML
 - If the user only asks for ML, then yes, they likely need cleaning and feature engineering as prerequisites
+
+DISTINGUISH TRAINING vs PREDICTION (CRITICAL):
+
+🔴 MODEL TRAINING (needs_ml_modeling=true, needs_prediction=false):
+- "Train a model", "Build a model", "Create ML model"
+- "Clean and build ML model to predict survival" 
+- "Develop a classification model"
+- "Train machine learning algorithm"
+→ User wants to CREATE a new model
+
+🟢 PREDICTION WITH EXISTING MODEL (needs_prediction=true, needs_ml_modeling=false):
+- "Predict survival for Age=25, Sex=male, Pclass=3"
+- "Use the model to predict for new data"
+- "Classify this: Age=30, Income=50000"
+- "Make prediction using https://example.com/new_data.csv"
+→ User wants to USE an existing model with specific data
+
+🔵 MODEL ANALYSIS (needs_model_analysis=true):
+- "What features are most important?"
+- "Why did the model predict this?"
+- "How well does the model perform?"
+→ User wants to ANALYZE an existing model
+
+PREDICTION DATA EXTRACTION:
+- For single prediction: extract inline data like age=25, sex=male into extracted_prediction_data
+- For batch prediction: extract CSV URLs and set prediction_data_source
+- Set prediction_type: "single_prediction", "batch_prediction", or "model_analysis"
 
 RESPONSE REQUIREMENTS:
 - You MUST respond with valid JSON that matches the exact schema provided
