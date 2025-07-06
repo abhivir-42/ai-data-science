@@ -33,54 +33,15 @@ self._last_model_timestamp = None           # Tracks model training time
 
 ### Phase 1: Extend Schema & Session Management
 
-#### 1.1 Create ML Model Session Schema
-**File**: `ai-data-science/src/schemas/data_analysis_schemas.py`
+#### 1.1 Use Existing MLModelingMetrics (No New Schema Needed!)
+**File**: `ai-data-science/src/schemas/data_analysis_schemas.py` - **NO CHANGES NEEDED**
 
-```python
-class TrainedModelSession(BaseModel):
-    """Session information for a trained ML model with comprehensive H2O AutoML data."""
-    
-    # Core Model Info
-    model_path: str = Field(description="Path to saved H2O model")
-    best_model_id: str = Field(description="H2O model ID for the best model")
-    target_variable: str = Field(description="Target variable used for training")
-    
-    # Data Processing Chain
-    original_data_url: str = Field(description="Original CSV URL used for training")
-    cleaned_data_path: Optional[str] = Field(description="Path to cleaned data used for training")
-    feature_engineered_data_path: Optional[str] = Field(description="Path to feature-engineered data")
-    
-    # Feature Information
-    features_used: List[str] = Field(description="List of features used in training")
-    feature_columns: List[str] = Field(description="All feature column names")
-    categorical_features: List[str] = Field(description="Categorical feature names")
-    numerical_features: List[str] = Field(description="Numerical feature names")
-    enhanced_feature_importance: List[Dict[str, Any]] = Field(description="Enhanced feature importance analysis")
-    
-    # Model Performance
-    model_architecture: str = Field(description="Type of model (GBM, RandomForest, etc.)")
-    best_score: float = Field(description="Best model performance score")
-    cross_validation_score: Optional[float] = Field(description="CV score if available")
-    
-    # RICH H2O AutoML DATA (from existing MLModelingMetrics)
-    leaderboard: Optional[List[Dict[str, Any]]] = Field(description="Complete H2O AutoML leaderboard")
-    top_model_metrics: Dict[str, Any] = Field(description="Detailed metrics for the best model")
-    total_models_trained: int = Field(description="Total number of models trained in AutoML")
-    generated_code: Optional[str] = Field(description="AI-generated H2O training code")
-    recommended_steps: Optional[str] = Field(description="AI-recommended ML methodology")
-    workflow_summary: Optional[str] = Field(description="Summary of ML workflow executed")
-    
-    # Session Management
-    training_timestamp: float = Field(description="Unix timestamp when model was trained")
-    training_duration: float = Field(description="Training time in seconds")
-    
-    # Prediction Metadata
-    problem_type: Literal["classification", "regression"] = Field(description="ML problem type")
-    prediction_threshold: Optional[float] = Field(description="Classification threshold if applicable")
-    
-    # H2O Specific
-    h2o_cluster_info: Dict[str, Any] = Field(description="H2O cluster information for reuse")
-```
+✅ **IMPORTANT DISCOVERY**: The existing `MLModelingMetrics` already contains all the rich H2O data we need:
+- `model_path`, `leaderboard`, `top_model_metrics`, `total_models_trained`
+- `generated_code`, `recommended_steps`, `workflow_summary`, `model_architecture`
+- `enhanced_feature_importance` and all other comprehensive H2O AutoML data
+
+**We can reuse the existing schema completely!** This simplifies the implementation significantly.
 
 #### 1.2 Extend Enhanced uAgent Session Management
 **File**: `ai-data-science/src/uagent_v2/enhanced_uagent.py`
@@ -95,8 +56,14 @@ class EnhancedDataAnalysisUAgent:
         self._last_processed_timestamp = None
         
         # NEW: ML model session management  
-        self._last_trained_model = None          # TrainedModelSession object
+        self._last_trained_model = None          # MLModelingMetrics object from successful ML training
         self._last_model_timestamp = None        # When model was trained
+        self._last_training_result = None        # AgentExecutionResult with ML metrics
+        self._last_target_variable = None        # Target variable used for training
+        
+        # NEW: Initialize prediction formatter (ADD TO EXISTING __init__)
+        from .prediction_formatters import PredictionResponseFormatter
+        self.prediction_formatter = PredictionResponseFormatter(self.config)
         
     def _store_ml_model_if_available(self, result: DataAnalysisResult):
         """Store trained ML model information for follow-up predictions."""
@@ -111,42 +78,33 @@ class EnhancedDataAnalysisUAgent:
             if ml_agent_result and ml_agent_result.ml_modeling_metrics:
                 metrics = ml_agent_result.ml_modeling_metrics
                 
-                # Create ML model session object with rich H2O data
-                model_session = TrainedModelSession(
-                    model_path=metrics.model_path,
-                    best_model_id=metrics.best_model_id,
-                    target_variable=self._extract_target_variable(result),
-                    original_data_url=result.csv_url,
-                    cleaned_data_path=self._find_cleaned_data_path(result),
-                    feature_engineered_data_path=self._find_feature_data_path(result),
-                    features_used=metrics.features_used or [],
-                    feature_columns=self._extract_feature_columns(result),
-                    categorical_features=[],  # TODO: Extract from feature engineering
-                    numerical_features=[],    # TODO: Extract from feature engineering  
-                    enhanced_feature_importance=metrics.enhanced_feature_importance or [],
-                    model_architecture=metrics.model_architecture or "Unknown",
-                    best_score=metrics.best_model_score or 0.0,
-                    cross_validation_score=metrics.cross_validation_score,
-                    # Rich H2O AutoML data
-                    leaderboard=metrics.leaderboard,
-                    top_model_metrics=metrics.top_model_metrics or {},
-                    total_models_trained=metrics.total_models_trained or 1,
-                    generated_code=metrics.generated_code,
-                    recommended_steps=metrics.recommended_steps,
-                    workflow_summary=metrics.workflow_summary,
-                    training_timestamp=time.time(),
-                    training_duration=metrics.training_time_seconds,
-                    problem_type=self._determine_problem_type(result),
-                    h2o_cluster_info={}  # TODO: Extract H2O cluster info if needed
-                )
-                
-                self._last_trained_model = model_session
+                # Store the existing MLModelingMetrics directly (no new schema needed!)
+                self._last_trained_model = metrics
                 self._last_model_timestamp = time.time()
+                self._last_training_result = ml_agent_result
+                self._last_target_variable = self._extract_target_variable(result)
                 
-                self.logger.info(f"Stored trained model session: {model_session.best_model_id}")
+                self.logger.info(f"Stored trained model session: {metrics.best_model_id}")
+                self.logger.info(f"Model path: {metrics.model_path}")
+                self.logger.info(f"Target variable: {self._last_target_variable}")
                 
         except Exception as e:
             self.logger.warning(f"Could not store ML model session: {e}")
+    
+    def _extract_target_variable(self, result: DataAnalysisResult) -> Optional[str]:
+        """Extract target variable from the analysis result."""
+        # Try workflow intent first
+        if result.workflow_intent.suggested_target_variable:
+            return result.workflow_intent.suggested_target_variable
+        
+        # Try to find from ML agent execution logs
+        for agent_result in result.agent_results:
+            if agent_result.agent_name == "h2o_ml" and agent_result.success:
+                # Target variable might be in log messages or metadata
+                # This would need to be extracted from the actual agent execution
+                pass
+        
+        return None
     
     def _is_model_session_expired(self) -> bool:
         """Check if the ML model session has expired."""
@@ -220,9 +178,11 @@ PREDICTION REQUEST PATTERNS:
 - Questions about model: "what features are important", "why did the model predict", "model performance"
 
 PREDICTION DATA EXTRACTION:
-- Look for CSV URLs for batch prediction
-- Look for inline data like: age=25, income=50000
-- Look for "predict for" followed by data values
+- Look for CSV URLs for batch prediction and set prediction_data_source
+- Look for inline data like: age=25, income=50000 and set extracted_prediction_data
+- Look for "predict for" followed by data values and parse into key-value pairs
+- Set prediction_type to "single_prediction", "batch_prediction", or "model_analysis"
+- Extract structured prediction input data into extracted_prediction_data field
 """
 ```
 
@@ -235,8 +195,9 @@ PREDICTION DATA EXTRACTION:
 class MLPredictionAgent:
     """Agent for making predictions with trained H2O models."""
     
-    def __init__(self, model_session: TrainedModelSession, config: UAgentConfig):
-        self.model_session = model_session
+    def __init__(self, model_metrics: MLModelingMetrics, target_variable: str, config: UAgentConfig):
+        self.model_metrics = model_metrics
+        self.target_variable = target_variable
         self.config = config
         self.logger = logging.getLogger(__name__)
         self._h2o_model = None
@@ -247,8 +208,8 @@ class MLPredictionAgent:
             import h2o
             h2o.init()
             
-            self._h2o_model = h2o.load_model(self.model_session.model_path)
-            self.logger.info(f"Loaded H2O model: {self.model_session.best_model_id}")
+            self._h2o_model = h2o.load_model(self.model_metrics.model_path)
+            self.logger.info(f"Loaded H2O model: {self.model_metrics.best_model_id}")
             
         except Exception as e:
             raise MLPredictionError(f"Failed to load model: {e}")
@@ -269,8 +230,10 @@ class MLPredictionAgent:
             # Convert to results
             pred_df = predictions.as_data_frame()
             
-            # Format results based on problem type
-            if self.model_session.problem_type == "classification":
+            # Format results based on problem type  
+            # Determine problem type from model metrics or target variable characteristics
+            problem_type = self._determine_problem_type()
+            if problem_type == "classification":
                 return self._format_classification_result(pred_df, input_data)
             else:
                 return self._format_regression_result(pred_df, input_data)
@@ -318,19 +281,19 @@ class MLPredictionAgent:
             llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.1)
             
             model_info = {
-                "architecture": self.model_session.model_architecture,
-                "features": self.model_session.features_used,
-                "performance": self.model_session.best_score,
-                "target": self.model_session.target_variable,
-                "training_duration": self.model_session.training_duration,
+                "architecture": self.model_metrics.model_architecture,
+                "features": self.model_metrics.features_used,
+                "performance": self.model_metrics.best_model_score,
+                "target": self.target_variable,
+                "training_duration": self.model_metrics.training_time_seconds,
                 # Rich H2O data for comprehensive analysis
-                "leaderboard": self.model_session.leaderboard,
-                "top_model_metrics": self.model_session.top_model_metrics,
-                "total_models_trained": self.model_session.total_models_trained,
-                "feature_importance": self.model_session.enhanced_feature_importance,
-                "generated_code": self.model_session.generated_code,
-                "recommended_steps": self.model_session.recommended_steps,
-                "workflow_summary": self.model_session.workflow_summary
+                "leaderboard": self.model_metrics.leaderboard,
+                "top_model_metrics": self.model_metrics.top_model_metrics,
+                "total_models_trained": self.model_metrics.total_models_trained,
+                "feature_importance": self.model_metrics.enhanced_feature_importance,
+                "generated_code": self.model_metrics.generated_code,
+                "recommended_steps": self.model_metrics.recommended_steps,
+                "workflow_summary": self.model_metrics.workflow_summary
             }
             
             prompt = f"""
@@ -366,6 +329,108 @@ class MLPredictionAgent:
             
         except Exception as e:
             raise MLPredictionError(f"Model analysis failed: {e}")
+    
+    def _determine_problem_type(self) -> str:
+        """Determine if this is a classification or regression problem."""
+        # Try to determine from model architecture
+        if self.model_metrics.model_architecture:
+            arch = self.model_metrics.model_architecture.lower()
+            if "classification" in arch:
+                return "classification"
+            elif "regression" in arch:
+                return "regression"
+        
+        # Try to determine from metrics
+        if self.model_metrics.top_model_metrics:
+            metrics = self.model_metrics.top_model_metrics
+            # AUC suggests classification, RMSE suggests regression
+            if 'auc' in str(metrics).lower() or 'logloss' in str(metrics).lower():
+                return "classification"
+            elif 'rmse' in str(metrics).lower() or 'mae' in str(metrics).lower():
+                return "regression"
+        
+        # Default fallback
+        return "classification"
+    
+    def _format_classification_result(self, pred_df: pd.DataFrame, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format classification prediction results."""
+        # Get prediction and probability
+        prediction = pred_df.iloc[0]['predict'] if 'predict' in pred_df.columns else pred_df.iloc[0, 0]
+        
+        # Get probability if available
+        probability = None
+        prob_cols = [col for col in pred_df.columns if col.startswith('p') and col != 'predict']
+        if prob_cols:
+            probability = pred_df.iloc[0][prob_cols[0]]
+        
+        return {
+            "prediction_type": "single_prediction", 
+            "target_variable": self.target_variable,
+            "prediction": prediction,
+            "probability": probability,
+            "input_data": input_data,
+            "model_architecture": self.model_metrics.model_architecture,
+            "model_score": self.model_metrics.best_model_score
+        }
+    
+    def _format_regression_result(self, pred_df: pd.DataFrame, input_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Format regression prediction results."""
+        prediction = pred_df.iloc[0]['predict'] if 'predict' in pred_df.columns else pred_df.iloc[0, 0]
+        
+        return {
+            "prediction_type": "single_prediction",
+            "target_variable": self.target_variable,
+            "prediction": prediction,
+            "input_data": input_data,
+            "model_architecture": self.model_metrics.model_architecture,
+            "model_score": self.model_metrics.best_model_score
+        }
+    
+    def _save_prediction_results(self, result_df: pd.DataFrame) -> str:
+        """Save batch prediction results to file."""
+        import os
+        from datetime import datetime
+        
+        # Generate unique filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"batch_predictions_{timestamp}.csv"
+        
+        # Use config output directory or create default
+        output_dir = getattr(self.config, 'output_dir', 'outputs')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        output_path = os.path.join(output_dir, filename)
+        result_df.to_csv(output_path, index=False)
+        
+        return output_path
+    
+    def _summarize_batch_predictions(self, pred_df: pd.DataFrame) -> Dict[str, Any]:
+        """Create summary statistics for batch predictions."""
+        summary = {}
+        
+        if 'predict' in pred_df.columns:
+            predictions = pred_df['predict']
+            
+            # For classification
+            if predictions.dtype == 'object' or predictions.nunique() < 20:
+                summary['prediction_counts'] = predictions.value_counts().to_dict()
+            
+            # For regression
+            else:
+                summary['prediction_stats'] = {
+                    'mean': float(predictions.mean()),
+                    'std': float(predictions.std()),
+                    'min': float(predictions.min()),
+                    'max': float(predictions.max())
+                }
+        
+        return summary
+
+
+# Custom exception for ML prediction errors
+class MLPredictionError(Exception):
+    """Custom exception for ML prediction failures."""
+    pass
 ```
 
 #### 3.2 Create Prediction Response Formatters
@@ -510,7 +575,11 @@ def _handle_prediction_request(self, query: str, intent: WorkflowIntent) -> str:
         # Intent already parsed - use it directly
         # Create prediction agent
         from src.agents.ml_prediction_agent import MLPredictionAgent
-        prediction_agent = MLPredictionAgent(self._last_trained_model, self.config)
+        prediction_agent = MLPredictionAgent(
+            self._last_trained_model, 
+            self._last_target_variable, 
+            self.config
+        )
         
         # Execute prediction based on intent
         if intent.prediction_type == "single_prediction":
@@ -537,7 +606,11 @@ def _handle_model_analysis_request(self, query: str, intent: WorkflowIntent) -> 
         
         # Create prediction agent for analysis
         from src.agents.ml_prediction_agent import MLPredictionAgent
-        prediction_agent = MLPredictionAgent(self._last_trained_model, self.config)
+        prediction_agent = MLPredictionAgent(
+            self._last_trained_model, 
+            self._last_target_variable, 
+            self.config
+        )
         
         # Analyze model (intent already parsed)
         result = prediction_agent.analyze_model(query)
@@ -565,6 +638,21 @@ Me: [Trains model and shows results]
 You: "Predict survival for Age=25, Sex=male, Pclass=3"
 Me: [Uses trained model to make prediction]
 ```
+"""
+
+def _create_prediction_error_response(self, error: Exception) -> str:
+    """Create error response for prediction failures."""
+    return f"""
+🚫 **Prediction Error**
+
+Sorry, I encountered an issue while making the prediction: {str(error)}
+
+**Common solutions:**
+1. Check that your input data format matches the training data
+2. Ensure all required features are provided
+3. Try retraining the model if data format has changed
+
+**Need help?** Try asking: "What features does the model expect?" or retrain with: "Train a new model using [your dataset URL]"
 """
 ```
 
@@ -632,10 +720,10 @@ def test_ml_prediction_workflow():
 ## 🎯 Implementation Timeline
 
 ### Week 1: Schema & Session Management
-- [ ] Create `TrainedModelSession` schema
-- [ ] Extend `WorkflowIntent` for predictions
-- [ ] Update enhanced uAgent session management
-- [ ] Add model storage methods
+- [ ] Extend `WorkflowIntent` for predictions (2 new fields)
+- [ ] Update enhanced uAgent session management (4 new instance variables)  
+- [ ] Add model storage methods (1 new method, reuse existing MLModelingMetrics)
+- [ ] Add prediction formatter initialization to enhanced uAgent __init__
 
 ### Week 2: Intent Parser & Prediction Engine
 - [ ] Enhance intent parser for prediction recognition
@@ -728,4 +816,10 @@ This implementation leverages the existing excellent architecture while adding p
 - ✅ **Comprehensive Answers**: Uses all stored H2O data for detailed analysis
 - ✅ **Feature Importance**: Can answer detailed questions about feature importance
 - ✅ **Leaderboard Insights**: Can explain why specific models were chosen
-- ✅ **Performance Analysis**: Detailed metrics and cross-validation results 
+- ✅ **Performance Analysis**: Detailed metrics and cross-validation results
+
+### 5. **Simplified Architecture (Key Correction)**
+- ✅ **Reuse Existing Schema**: No new `TrainedModelSession` needed - use existing `MLModelingMetrics`
+- ✅ **Seamless Integration**: Store `MLModelingMetrics` directly from successful ML training
+- ✅ **Consistent with Existing Patterns**: Follows the same session management pattern as cleaned data
+- ✅ **Complete Method Implementations**: All helper methods for prediction formatting included 

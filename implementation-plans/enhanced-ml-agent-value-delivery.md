@@ -802,14 +802,15 @@ def format_analysis_result(self, result: DataAnalysisResult) -> str:
     
     return "\n".join(lines)
 ```
-```
+
 
 ---
 
 ## Phase 3: Session Memory + Structured Prediction Intent Recognition
 
 ### **Overview**
-Replace hardcoded regex patterns with sophisticated **LangChain structured output system** that extends existing `WorkflowIntent` schema and `DataAnalysisIntentParser` patterns for intelligent prediction intent recognition.
+Replace hardcoded regex patterns with sophisticated **LangChain structured output system** that extends existing `WorkflowIntent` schema and `DataAnalysisIntentParser` patterns for intelligent intent recognition to also recognise when the user request is asking for a prediction (for which 
+an ML model-- which should've already been created and loaded in the schema-- needs to be called).
 
 ### **3.1 Enhanced Schema Design**
 
