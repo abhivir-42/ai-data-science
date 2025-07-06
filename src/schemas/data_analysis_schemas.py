@@ -181,6 +181,30 @@ class WorkflowIntent(BaseModel):
         le=1.0,
         description="Confidence score for target variable suggestion"
     )
+    
+    # NEW: Prediction-specific intent fields
+    needs_prediction: bool = Field(
+        default=False,
+        description="Request requires making predictions with existing model"
+    )
+    needs_model_analysis: bool = Field(
+        default=False,
+        description="Request requires analyzing existing model results/insights"
+    )
+    
+    # NEW: Prediction details
+    prediction_data_source: Optional[str] = Field(
+        default=None,
+        description="Data source for prediction (CSV URL, inline data, etc.)"
+    )
+    prediction_type: Optional[Literal["single_prediction", "batch_prediction", "model_analysis"]] = Field(
+        default=None,
+        description="Type of prediction request"
+    )
+    extracted_prediction_data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Extracted prediction input data from user request"
+    )
 
 
 class DataQualityMetrics(BaseModel):

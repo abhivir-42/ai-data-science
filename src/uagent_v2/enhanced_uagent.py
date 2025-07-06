@@ -100,6 +100,12 @@ class EnhancedDataAnalysisUAgent:
         self._last_cleaned_data = None
         self._last_processed_timestamp = None
         
+        # NEW: ML model session management  
+        self._last_trained_model = None          # MLModelingMetrics object from successful ML training
+        self._last_model_timestamp = None        # When model was trained
+        self._last_training_result = None        # AgentExecutionResult with ML metrics
+        self._last_target_variable = None        # Target variable used for training
+        
         self.logger.info(f"Enhanced uAgent initialized with config: {self.config.to_dict()}")
     
     def process_query(self, query: Union[str, Dict[str, Any]]) -> str:
@@ -182,6 +188,9 @@ Sorry, I encountered an issue: {str(error)}
             # Store cleaned data for potential follow-up requests (same as original)
             self._store_cleaned_data_if_available()
             
+            # NEW: Store ML model for potential predictions
+            self._store_ml_model_if_available(result)
+            
             # Format the structured result for uAgent compatibility (same as original)
             return self.result_formatter.format_analysis_result_enhanced(result)
             
@@ -223,6 +232,62 @@ Sorry, I encountered an issue: {str(error)}
             self._last_cleaned_data = None
             self._last_processed_timestamp = None
             self.logger.info("Session data cleaned up due to expiration")
+    
+    def _has_trained_model(self) -> bool:
+        """Check if we have a valid trained model in session."""
+        return (self._last_trained_model is not None and 
+                not self._is_model_session_expired() and
+                self._last_trained_model.model_path is not None)
+    
+    def _is_model_session_expired(self) -> bool:
+        """Check if the ML model session has expired."""
+        if not self._last_model_timestamp:
+            return True
+        
+        session_age = time.time() - self._last_model_timestamp
+        max_age = self.config.session_timeout_hours * 3600
+        return session_age > max_age
+    
+    def _store_ml_model_if_available(self, result):
+        """Store trained ML model information for follow-up predictions."""
+        try:
+            # Find ML agent result
+            ml_agent_result = None
+            for agent_result in result.agent_results:
+                if agent_result.agent_name == "h2o_ml" and agent_result.success:
+                    ml_agent_result = agent_result
+                    break
+            
+            if ml_agent_result and ml_agent_result.ml_modeling_metrics:
+                metrics = ml_agent_result.ml_modeling_metrics
+                
+                # Store the existing MLModelingMetrics directly (no new schema needed!)
+                self._last_trained_model = metrics
+                self._last_model_timestamp = time.time()
+                self._last_training_result = ml_agent_result
+                self._last_target_variable = self._extract_target_variable(result)
+                
+                self.logger.info(f"Stored trained model session: {metrics.best_model_id}")
+                self.logger.info(f"Model path: {metrics.model_path}")
+                self.logger.info(f"Target variable: {self._last_target_variable}")
+                
+        except Exception as e:
+            self.logger.warning(f"Could not store ML model session: {e}")
+    
+    def _extract_target_variable(self, result) -> Optional[str]:
+        """Extract target variable from the analysis result."""
+        # Try workflow intent first
+        if result.workflow_intent.suggested_target_variable:
+            return result.workflow_intent.suggested_target_variable
+        
+        # Try to find from ML agent execution logs
+        for agent_result in result.agent_results:
+            if agent_result.agent_name == "h2o_ml" and agent_result.success:
+                # Target variable might be in log messages or metadata
+                # This would need to be extracted from the actual agent execution
+                pass
+        
+        return None
 
 
 def create_enhanced_uagent_function(config: Optional[UAgentConfig] = None):
