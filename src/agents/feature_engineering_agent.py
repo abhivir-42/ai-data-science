@@ -727,12 +727,28 @@ def make_feature_engineering_agent(
                 import pandas as pd
                 import numpy as np
                 ...
+                
+                # CRITICAL: Validate target column exists
+                target_col = '{target_variable}'
+                if target_col and target_col not in data_engineered.columns:
+                    if target_col in data_raw.columns:
+                        data_engineered[target_col] = data_raw[target_col]
+                    else:
+                        print(f"WARNING: Target column {{target_col}} not found!")
+                
                 return data_engineered
             
             Best Practices and Error Preventions:
             - Handle missing values in numeric and categorical features before transformations.
             - Avoid creating highly correlated features unless explicitly instructed.
             - Convert Boolean to integer values (0/1) after one-hot encoding unless otherwise instructed.
+            
+            CRITICAL - Target Column Preservation:
+            - NEVER remove or modify the target column: {target_variable}
+            - Always check that the target column exists in the final output
+            - If target column is missing, add it back from the original data
+            - Use unique column names to avoid pandas dropping duplicates
+            - Validate final DataFrame has all required columns before returning
             
             IMPORTANT - Use Modern Sklearn Syntax (v1.6+):
             - Use OneHotEncoder(sparse_output=False) instead of OneHotEncoder(sparse=False)
@@ -795,6 +811,44 @@ def make_feature_engineering_agent(
         }
 
     def execute_feature_engineering_code(state):
+        def safe_post_processing(df):
+            """Safe post-processing that preserves target column and handles duplicates"""
+            if not isinstance(df, pd.DataFrame):
+                return df
+            
+            target_variable = state.get("target_variable")
+            
+            # Check for duplicate columns
+            if df.columns.duplicated().any():
+                print(f"⚠️  WARNING: Duplicate columns detected: {df.columns[df.columns.duplicated()].tolist()}")
+                
+                # Handle duplicates by keeping only the first occurrence
+                df = df.loc[:, ~df.columns.duplicated()]
+                print(f"✅ Removed duplicate columns. New shape: {df.shape}")
+            
+            # CRITICAL: Ensure target column exists if specified
+            if target_variable and target_variable not in df.columns:
+                print(f"🚨 CRITICAL ERROR: Target column '{target_variable}' missing from feature engineered data!")
+                print(f"   Available columns: {list(df.columns)}")
+                
+                # Try to recover by loading original data
+                try:
+                    original_data = state.get("data_raw")
+                    if original_data and isinstance(original_data, dict):
+                        original_df = pd.DataFrame.from_dict(original_data)
+                        if target_variable in original_df.columns:
+                            print(f"🔧 RECOVERY: Adding target column '{target_variable}' from original data")
+                            df[target_variable] = original_df[target_variable]
+                        else:
+                            print(f"❌ RECOVERY FAILED: Target '{target_variable}' not in original data either")
+                except Exception as e:
+                    print(f"❌ RECOVERY FAILED: {e}")
+            
+            print(f"✅ Final feature engineered data shape: {df.shape}")
+            print(f"✅ Final columns: {list(df.columns)}")
+            
+            return df.to_dict()
+        
         return node_func_execute_agent_code_on_data(
             state=state,
             data_key="data_raw",
@@ -803,7 +857,7 @@ def make_feature_engineering_agent(
             code_snippet_key="feature_engineer_function",
             agent_function_name=state.get("feature_engineer_function_name"),
             pre_processing=lambda data: pd.DataFrame.from_dict(data),
-            post_processing=lambda df: df.to_dict() if isinstance(df, pd.DataFrame) else df,
+            post_processing=safe_post_processing,
             error_message_prefix="An error occurred during feature engineering: "
         )
 
