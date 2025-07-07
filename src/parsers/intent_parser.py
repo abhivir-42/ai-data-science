@@ -66,6 +66,7 @@ class DataAnalysisIntentParser:
 You will be given:
 1. A user's natural language request for data analysis
 2. Basic information about their dataset (columns, data types, shape)
+3. Current model session context (whether a model exists)
 
 Your job is to intelligently determine:
 - What data analysis steps are needed (cleaning, feature engineering, ML modeling)
@@ -90,30 +91,76 @@ DISTINGUISH TRAINING vs PREDICTION (CRITICAL):
 - "Clean and build ML model to predict survival" 
 - "Develop a classification model"
 - "Train machine learning algorithm"
+- "Create/build/train/develop/make a {{model/classifier/predictor}}"
+- "I want to train on {{dataset}}"
+- "Learn from this data"
+- "Build ML algorithm"
 → User wants to CREATE a new model
 
 🟢 PREDICTION WITH EXISTING MODEL (needs_prediction=true, needs_ml_modeling=false):
+**STRONG PREDICTION INDICATORS:**
+- Contains specific values: "Age=25, Sex=male, Pclass=3"
+- Question format: "What would be the {{target}} for...?"
+- Imperative: "Predict {{target}} for..."
+- Calculation: "Calculate {{target}} for..."
+- Estimation: "Estimate {{target}} for..."
+- Assessment: "What's the {{target}} if..."
+- Scenario: "For someone with {{features}}, what would {{target}} be?"
+
+**PREDICTION PATTERNS:**
 - "Predict survival for Age=25, Sex=male, Pclass=3"
-- "Use the model to predict for new data"
-- "Classify this: Age=30, Income=50000"
-- "Make prediction using https://example.com/new_data.csv"
 - "What would be the tip for a bill of $35 with 4 people?"
 - "Predict tip for total_bill=25.0, size=2"
-- "What's the predicted value for..."
-- "Calculate prediction for..."
-- "Estimate the target for..."
-→ User wants to USE an existing model with specific data
+- "What's the predicted house price for rooms=6, {{age}}=50?"
+- "Calculate diabetes risk for Glucose=148, BMI=33.6, {{Age}}=50"
+- "Estimate wine quality for alcohol=12.5, acidity=0.7"
+- "What's the MPG for cylinders=4, horsepower=85, weight=2500?"
+- "For a customer with tenure=12, MonthlyCharges=70, will they churn?"
+- "Assess fraud risk for Amount=149.62, V1=-1.5, V2=2.3"
+- "What grade would a student get with studytime=3, failures=0?"
+- "Predict fuel efficiency for a car with 4 cylinders, 100hp"
+- "What salary for 5 years experience, Master's degree?"
+- "Air quality prediction for temp=25, humidity=60, wind=10"
+
+**CONTEXT-AWARE PREDICTION DETECTION:**
+- If has_trained_model=True AND user provides feature values → PREDICTION (99% confidence)
+- If has_trained_model=True AND user asks "what would be X" → PREDICTION (95% confidence)
+- If has_trained_model=True AND user mentions target variable → PREDICTION (90% confidence)
+- If has_trained_model=False AND user provides feature values → Still PREDICTION (attempt with existing model)
+
+**BATCH PREDICTION:**
+- "Use the model to predict for new data"
+- "Classify this CSV: https://example.com/new_data.csv"
+- "Make predictions using https://example.com/test_data.csv"
+- "Predict for batch of customers"
+- "Apply model to new dataset"
+→ User wants to USE an existing model with batch data
 
 🔵 MODEL ANALYSIS (needs_model_analysis=true):
 - "What features are most important?"
 - "Why did the model predict this?"
 - "How well does the model perform?"
+- "What's the model accuracy?"
+- "Analyze model performance"
+- "Feature importance analysis"
+- "Model evaluation metrics"
+- "What drives the predictions?"
+- "How good is the model?"
+- "Model insights and interpretation"
 → User wants to ANALYZE an existing model
 
-PREDICTION DATA EXTRACTION:
-- For single prediction: extract inline data like age=25, sex=male into extracted_prediction_data
+ENHANCED PREDICTION DATA EXTRACTION:
+- For single prediction: extract ALL inline data like {{age}}=25, {{sex}}=male into extracted_prediction_data
+- Parse natural language: "35 year old male in first class" → {{{{age: 35, sex: male, pclass: 1}}}}
+- Handle ranges: "bill between $20-30" → use midpoint or ask for clarification
 - For batch prediction: extract CSV URLs and set prediction_data_source
 - Set prediction_type: "single_prediction", "batch_prediction", or "model_analysis"
+
+AMBIGUITY RESOLUTION:
+- If unclear between training/prediction: favor PREDICTION if has_trained_model=True
+- If user provides values but unclear intent: favor PREDICTION
+- If user mentions both training and prediction: favor TRAINING (they want to retrain)
+- If completely ambiguous: set lower confidence (0.3-0.5) and choose most likely
 
 RESPONSE REQUIREMENTS:
 - You MUST respond with valid JSON that matches the exact schema provided
@@ -125,7 +172,10 @@ RESPONSE REQUIREMENTS:
 EXAMPLES:
 - "Clean the dataset" → needs_data_cleaning=true, needs_feature_engineering=false, needs_ml_modeling=false
 - "Build a model to predict X" → needs_data_cleaning=true, needs_feature_engineering=true, needs_ml_modeling=true
-- "Engineer features for the data" → needs_data_cleaning=false, needs_feature_engineering=true, needs_ml_modeling=false"""
+- "Engineer features for the data" → needs_data_cleaning=false, needs_feature_engineering=true, needs_ml_modeling=false
+- "What would be the tip for bill=$35, size=4?" → needs_prediction=true, prediction_type="single_prediction"
+- "Predict house price for rooms=6, age=50" → needs_prediction=true, prediction_type="single_prediction"
+- "How accurate is the model?" → needs_model_analysis=true"""
 
         user_prompt = """USER REQUEST: {user_request}
 
@@ -141,7 +191,7 @@ MODEL SESSION CONTEXT:
 - Target Variable: {target_variable}
 - Model Available: {model_available}
 
-IMPORTANT: If has_trained_model=True and the user mentions values for the target variable or asks "what would be the [target]", this is likely a PREDICTION REQUEST, not a new training request.
+IMPORTANT: If has_trained_model=True and the user mentions values for the target variable or asks "what would be the {{target}}", this is likely a PREDICTION REQUEST, not a new training request.
 
 Based on this information, analyze the user's request and provide a structured workflow intent analysis.
 

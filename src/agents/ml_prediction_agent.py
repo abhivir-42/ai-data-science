@@ -40,8 +40,17 @@ class MLPredictionAgent:
             import h2o
             h2o.init()
             
-            self._h2o_model = h2o.load_model(self.model_metrics.model_path)
-            self.logger.info(f"Loaded H2O model: {self.model_metrics.best_model_id}")
+            # Try to get model from H2O cluster by ID first (model in memory)
+            try:
+                self._h2o_model = h2o.get_model(self.model_metrics.best_model_id)
+                self.logger.info(f"Loaded H2O model from cluster: {self.model_metrics.best_model_id}")
+            except Exception:
+                # Fallback to file loading if model path is available
+                if self.model_metrics.model_path:
+                    self._h2o_model = h2o.load_model(self.model_metrics.model_path)
+                    self.logger.info(f"Loaded H2O model from file: {self.model_metrics.best_model_id}")
+                else:
+                    raise MLPredictionError(f"Model {self.model_metrics.best_model_id} not found in H2O cluster and no file path available")
             
         except ImportError:
             raise MLPredictionError("H2O is not installed. Please install h2o package: pip install h2o")

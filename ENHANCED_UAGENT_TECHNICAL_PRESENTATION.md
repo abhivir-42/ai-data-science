@@ -1,15 +1,14 @@
-# 🏗️ Enhanced uAgent v2.0 - Technical Architecture Presentation
+# 🏗️ Data Science uAgent - Technical Architecture Presentation
 
 ## 📋 **EXECUTIVE SUMMARY**
 
-Enhanced uAgent v2.0 is a production-ready AI Data Science Agent that processes natural language requests and provides end-to-end machine learning capabilities. The system intelligently routes user requests through different processing pipelines based on intent analysis and maintains session state for continuous interactions.
+Data Science uAgent is a production-ready AI Data Science Agent that processes natural language requests and provides end-to-end machine learning capabilities. The system intelligently routes user requests through different processing pipelines based on intent analysis and maintains session state for continuous interactions.
 
 ### 🎯 **KEY TECHNICAL ACHIEVEMENTS**
 - **Intelligent Request Routing**: AI-powered intent parser determines appropriate processing workflow
 - **Robust ML Pipeline**: Automated data cleaning, feature engineering, and model training
 - **Session Management**: Persistent model storage enables prediction workflows
 - **Error Recovery**: Automatic fallback mechanisms ensure system reliability
-- **Memory Optimization**: 90%+ memory reduction through intelligent data handling
 
 ---
 
@@ -17,28 +16,28 @@ Enhanced uAgent v2.0 is a production-ready AI Data Science Agent that processes 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    ENHANCED UAGENT v2.0                        │
+│                    ENHANCED UAGENT v2.0                         │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐    ┌──────────────────────────────────┐    │
-│  │   User Input    │───▶│      Intent Parser (LLM)        │    │
-│  │  Natural Lang.  │    │  • Request Classification       │    │
-│  └─────────────────┘    │  • URL Extraction               │    │
-│                         │  • Context Analysis             │    │
+│  │   User Input    │───▶│      Intent Parser (LLM)         │    │
+│  │  Natural Lang.  │    │  • Request Classification        │    │
+│  └─────────────────┘    │  • URL Extraction                │    │
+│                         │  • Context Analysis              │    │
 │                         └──────────────┬───────────────────┘    │
 │                                        │                        │
 │  ┌─────────────────────────────────────▼───────────────────┐    │
 │  │              REQUEST ROUTER                             │    │
 │  │                                                         │    │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐   │    │
-│  │  │ ML Training │ │ Prediction  │ │ Model Analysis  │   │    │
-│  │  │ Pipeline    │ │ Pipeline    │ │ Pipeline        │   │    │
-│  │  └─────────────┘ └─────────────┘ └─────────────────┘   │    │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐    │    │
+│  │  │ ML Training │ │ Prediction  │ │ Model Analysis  │    │    │
+│  │  │ Pipeline    │ │ Pipeline    │ │ Pipeline        │    │    │
+│  │  └─────────────┘ └─────────────┘ └─────────────────┘    │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │              SESSION MANAGEMENT                         │    │
-│  │  • Model Storage     • Memory Optimization             │    │
-│  │  • Context Tracking • Error Recovery                   │    │
+│  │  • Model Storage     • Memory Optimization              │    │
+│  │  • Context Tracking • Error Recovery                    │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -149,13 +148,13 @@ The system automatically transforms user input to match the trained model's feat
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │ Analysis    │───▶│ Model       │───▶│ Insight     │
-│ Request     │    │ Introspection│    │ Generation  │
+│ Request     │    │Introspection│    │ Generation  │
 └─────────────┘    └─────────────┘    └─────────────┘
        │                   │                  │
        ▼                   ▼                  ▼
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
 │ • Question  │    │ • Feature   │    │ • Business  │
-│ • Model ctx │    │ • Performance│    │ • Technical │
+│ • Model ctx │    │ •Performance│    │ • Technical │
 │ • User need │    │ • Metrics   │    │ • Actionable│
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
@@ -186,12 +185,6 @@ class EnhancedDataAnalysisUAgent:
 3. **Prediction Request** → Load model from H2O cluster, execute prediction
 4. **Session Cleanup** → Remove expired data, optimize memory
 
-### ⚡ **Memory Optimization**
-
-**Technique**: Intelligent DataFrame compression
-- **Before**: 11.7 MB typical dataset
-- **After**: 1.1 MB (90.6% reduction)
-- **Method**: Optimize dtypes, remove redundancy, compress categorical data
 
 ---
 
@@ -229,7 +222,7 @@ Recovery: Suggest valid request patterns
 
 ---
 
-## 🛡️ **ERROR HANDLING & RECOVERY**
+<!-- ## 🛡️ **ERROR HANDLING & RECOVERY**
 
 ### 🔧 **Feature Engineering Recovery**
 
@@ -254,7 +247,7 @@ def safe_post_processing(df):
         df[target_variable] = original_data[target_variable]
 ```
 
-**Result**: 100% success rate for model training
+**Result**: 100% success rate for model training -->
 
 ### 🔄 **Session Recovery**
 
@@ -332,7 +325,7 @@ def process_query(self, query: str) -> str:
 
 ---
 
-## 💡 **KEY TECHNICAL INNOVATIONS**
+## 💡 **KEY TECHNICAL POINTS**
 
 ### 🎯 **Context-Aware Intent Parsing**
 - **Model Session Context**: Passes trained model information to intent parser
@@ -366,7 +359,7 @@ def process_query(self, query: str) -> str:
 ### 📈 **Productivity Gains**
 - **Zero Learning Curve**: Natural language interface requires no training
 - **Rapid Iteration**: Immediate feedback and results
-- **Automated Workflows**: End-to-end processing without manual intervention
+- **Automated Workflows**: End-to-end processing without manual intervention. TODO: Human in the loop
 
 ### 🏢 **Enterprise Readiness**
 - **Scalable Architecture**: Handles multiple concurrent sessions
@@ -382,13 +375,13 @@ def process_query(self, query: str) -> str:
 - **Multi-Model Support**: Train and compare multiple models simultaneously
 - **Advanced Analytics**: Statistical analysis and data visualization
 - **Batch Processing**: Handle large-scale prediction requests
-- **Model Deployment**: Export models for production use
+- **Model Deployment**: Present model zip to the users for them to be able to use themselves
 
-### 🚀 **Technical Roadmap**
+<!-- ### 🚀 **Technical Roadmap**
 - **Distributed Processing**: Scale to multi-node H2O clusters
 - **Real-time Streaming**: Handle live data feeds
 - **Advanced NLP**: Support for text and document analysis
-- **Integration APIs**: Connect with existing business systems
+- **Integration APIs**: Connect with existing business systems -->
 
 ---
 
@@ -404,3 +397,43 @@ Enhanced uAgent v2.0 represents a significant advancement in conversational AI f
 - ✅ **User Experience**: Zero learning curve, maximum productivity
 
 **Ready for production deployment and scaling to enterprise requirements.** 🚀 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- ### ⚡ **Memory Optimization**
+
+- **Memory Optimization**: Memory usage omtimisation through intelligent data handling
+
+**Technique**: Intelligent DataFrame compression
+- **Before**: 11.7 MB typical dataset
+- **After**: 1.1 MB (90.6% reduction)
+- **Method**: Optimize dtypes, remove redundancy, compress categorical data
+
+
+The memory reduction is achieved through three main techniques:
+Streaming data processing - Only loading necessary chunks of data during training
+Model compression - Using H2O's built-in model compression after training
+Session cleanup - Automatically removing unused model artifacts and temporary data
+This is evidenced in the codebase through the ParameterMapper class and session management logic. -->

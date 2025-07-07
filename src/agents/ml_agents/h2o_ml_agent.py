@@ -545,7 +545,7 @@ def make_h2o_ml_agent(
             Return only code in ```python``` with a single function definition. Use this as an example starting template:
             ```python
             def {function_name}(
-                data_raw: List[Dict[str, Any]],
+                data_raw,
                 target: str,
                 max_runtime_secs: int,
                 exclude_algos: List[str],
@@ -557,12 +557,12 @@ def make_h2o_ml_agent(
                 stopping_tolerance: float,
                 stopping_rounds: int,
                 sort_metric: str ,
-                model_directory: Optional[str] = None,
-                log_path: Optional[str] = None,
+                model_directory = None,
+                log_path = None,
                 enable_mlflow: bool, # If use has specified to enable MLflow, make sure to make this True              
-                mlflow_tracking_uri: Optional[str], 
+                mlflow_tracking_uri = None, 
                 mlflow_experiment_name: str,
-                mlflow_run_name: str,
+                mlflow_run_name = None,
                 **kwargs # Additional parameters for H2OAutoML (feel free to add these based on user instructions and recommended steps)
             ):
 
