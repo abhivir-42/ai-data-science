@@ -775,6 +775,33 @@ Agent: [Analyzes stored model, returns feature importance insights]
 5. **Performance**: Efficient model loading and prediction execution
 6. **User Experience**: Clear, helpful responses for all prediction scenarios
 
+## 🔄 Additional Consideration: Result Formatting Integration
+
+**IMPORTANT**: The result formatting in `uagent_v2/result_formatters.py` may need updates to integrate with the new prediction capabilities. Specifically:
+
+### Analysis Needed:
+1. **Enhanced uAgent Result Flow**: How do prediction results flow through the existing result formatting system?
+2. **Format Integration**: Should prediction results be formatted alongside normal analysis results or separately?
+3. **Result Formatter Extensions**: Does `ResultFormatter.format_analysis_result_enhanced()` need to handle prediction results?
+
+### Current State:
+- **Prediction Formatters**: Separate `PredictionResponseFormatter` handles all prediction-specific formatting
+- **Integration**: Prediction requests bypass normal result formatting and use dedicated formatters
+- **Query Processing**: Intent parser determines request type and routes to appropriate handler
+
+### Potential Integration Points:
+1. **Mixed Workflows**: What happens if user requests both analysis and prediction in one query?
+2. **Result Consolidation**: Should there be a unified result format that combines analysis + prediction results?
+3. **Response Builder**: Should `ResponseBuilder` be extended to handle prediction responses?
+
+### Recommendation:
+**Phase 4**: Analyze and potentially refactor result formatting to create a unified response system that can handle:
+- Pure analysis results (current)
+- Pure prediction results (new)
+- Mixed analysis + prediction results (future consideration)
+
+This would ensure consistent formatting across all response types while maintaining backward compatibility.
+
 ## 🚧 Technical Considerations
 
 ### Memory Management
