@@ -763,6 +763,38 @@ def make_feature_engineering_agent(
             - Avoid unescaped backslashes in string literals
             - Use f-strings or .format() for string formatting, not % formatting
             
+            🚨 CRITICAL - Categorical Column Handling:
+            MUST handle pandas categorical columns safely to avoid "Cannot setitem on a Categorical with a new category" errors:
+            
+            ```python
+            # SAFE categorical handling for grouping low-frequency values
+            for col in categorical_columns:
+                if str(data[col].dtype) == 'category':
+                    # Method 1: Convert to object first, then group
+                    data[col] = data[col].astype('object')
+                    
+                    # Now safe to assign new values like 'Other'
+                    value_counts = data[col].value_counts()
+                    low_freq_values = value_counts[value_counts < threshold].index
+                    data[col] = data[col].replace(low_freq_values, 'Other')
+                
+                elif data[col].dtype == 'object':
+                    # Standard string/object columns - safe to assign directly
+                    value_counts = data[col].value_counts()
+                    low_freq_values = value_counts[value_counts < threshold].index
+                    data[col] = data[col].replace(low_freq_values, 'Other')
+            ```
+            
+            Alternative method - Add category first:
+            ```python
+            # Method 2: Add new category then assign
+            if str(data[col].dtype) == 'category':
+                if 'Other' not in data[col].cat.categories:
+                    data[col] = data[col].cat.add_categories(['Other'])
+                # Now safe to assign 'Other'
+                data[col] = data[col].replace(low_freq_values, 'Other')
+            ```
+            
             Avoid the following errors:
             
             - name 'OneHotEncoder' is not defined
@@ -774,6 +806,7 @@ def make_feature_engineering_agent(
             - Shape of passed values is (7043, 48), indices imply (7043, 47)
             - name 'numeric_features' is not defined
             - name 'categorical_features' is not defined
+            - Cannot setitem on a Categorical with a new category (Other), set the categories first
 
 
             """,
