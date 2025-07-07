@@ -251,13 +251,18 @@ class H2OMLAgent(BaseAgent):
         Synchronously trains an H2O AutoML model for the provided dataset,
         saving the best model to disk if model_directory or log_path is available.
         """
-        response = self._compiled_graph.invoke({
+        # Prepare parameters for the graph, including all kwargs
+        graph_input = {
             "user_instructions": user_instructions,
             "data_raw": data_raw.to_dict(),
             "target_variable": target_variable,
             "max_retries": max_retries,
-            "retry_count": retry_count
-        }, **kwargs)
+            "retry_count": retry_count,
+            # Pass through all additional parameters for H2O configuration
+            **kwargs
+        }
+        
+        response = self._compiled_graph.invoke(graph_input)
         self.response = response
         return None
 
@@ -414,6 +419,22 @@ def make_h2o_ml_agent(
         h2o_train_error: str
         max_retries: int
         retry_count: int
+        # Additional H2O configuration parameters
+        max_runtime_secs: int
+        model_directory: str
+        enable_mlflow: bool
+        mlflow_tracking_uri: str
+        mlflow_experiment_name: str
+        problem_type: str
+        cv_folds: int
+        balance_classes: bool
+        exclude_algos: list
+        max_models: int
+        seed: int
+        stopping_metric: str
+        stopping_tolerance: float
+        stopping_rounds: int
+        sort_metric: str
 
     # 1) Recommend ML steps (optional)
     def recommend_ml_steps(state: GraphState):
@@ -546,24 +567,24 @@ def make_h2o_ml_agent(
             ```python
             def {function_name}(
                 data_raw,
-                target: str,
-                max_runtime_secs: int,
-                exclude_algos: List[str],
-                balance_classes: bool,
-                nfolds: int,
-                seed: int,
-                max_models: int,
-                stopping_metric: str,
-                stopping_tolerance: float,
-                stopping_rounds: int,
-                sort_metric: str ,
-                model_directory = None,
-                log_path = None,
-                enable_mlflow: bool, # If use has specified to enable MLflow, make sure to make this True              
-                mlflow_tracking_uri = None, 
-                mlflow_experiment_name: str,
+                target: str = "{target_variable}",
+                max_runtime_secs: int = {max_runtime_secs},
+                exclude_algos = {exclude_algos},
+                balance_classes: bool = {balance_classes},
+                nfolds: int = {cv_folds},
+                seed: int = {seed},
+                max_models: int = {max_models},
+                stopping_metric: str = "{stopping_metric}",
+                stopping_tolerance: float = {stopping_tolerance},
+                stopping_rounds: int = {stopping_rounds},
+                sort_metric: str = "{sort_metric}",
+                model_directory = "{model_directory}",
+                log_path = "{log_path}",
+                enable_mlflow: bool = {enable_mlflow},
+                mlflow_tracking_uri = "{mlflow_tracking_uri}", 
+                mlflow_experiment_name: str = "{mlflow_experiment_name}",
                 mlflow_run_name = None,
-                **kwargs # Additional parameters for H2OAutoML (feel free to add these based on user instructions and recommended steps)
+                **kwargs # Additional parameters for H2OAutoML
             ):
 
                 import h2o
@@ -602,7 +623,33 @@ def make_h2o_ml_agent(
                     # Create H2OFrame
                     data_h2o = h2o.H2OFrame(df)
 
-                    # Setup AutoML
+                    # CRITICAL: Handle binary classification properly
+                    # Check if target is binary (0/1) and convert to categorical
+                    target_unique = data_h2o[target].unique().as_data_frame()
+                    unique_values = sorted(target_unique[target].tolist())
+                    
+                    is_binary_classification = (
+                        len(unique_values) == 2 and 
+                        set(unique_values) == {{0, 1}}
+                    )
+                    
+                    if is_binary_classification:
+                        # Convert target to categorical for binary classification
+                        data_h2o[target] = data_h2o[target].asfactor()
+                        print(f"✅ Detected binary classification - converted {{target}} to categorical")
+                        
+                        # Use appropriate classification metrics
+                        if stopping_metric in ['rmse', 'mae', 'mean_residual_deviance']:
+                            stopping_metric = 'AUC'
+                        if sort_metric in ['rmse', 'mae', 'mean_residual_deviance']:
+                            sort_metric = 'AUC'
+                    
+                    # Increase runtime for better models (minimum 180 seconds)
+                    if max_runtime_secs < 180:
+                        max_runtime_secs = 180
+                        print(f"⏱️  Increased runtime to {{max_runtime_secs}} seconds for better model quality")
+
+                    # Setup AutoML with proper configuration
                     aml = H2OAutoML(
                         max_runtime_secs=max_runtime_secs,
                         exclude_algos=exclude_algos,
@@ -717,6 +764,16 @@ def make_h2o_ml_agent(
                 "mlflow_tracking_uri",
                 "mlflow_experiment_name",
                 "mlflow_run_name",
+                "max_runtime_secs",
+                "cv_folds",
+                "balance_classes",
+                "exclude_algos",
+                "max_models",
+                "seed",
+                "stopping_metric",
+                "stopping_tolerance",
+                "stopping_rounds",
+                "sort_metric",
             ]
         )
 
@@ -729,12 +786,23 @@ def make_h2o_ml_agent(
             "target_variable": state.get("target_variable"),
             "recommended_steps": recommended_steps,
             "all_datasets_summary": all_datasets_summary_str,
-            "model_directory": model_directory,
+            "model_directory": state.get("model_directory", model_directory),
             "log_path": log_path,
-            "enable_mlflow": enable_mlflow,
-            "mlflow_tracking_uri": mlflow_tracking_uri,
-            "mlflow_experiment_name": mlflow_experiment_name,
+            "enable_mlflow": state.get("enable_mlflow", enable_mlflow),
+            "mlflow_tracking_uri": state.get("mlflow_tracking_uri", mlflow_tracking_uri),
+            "mlflow_experiment_name": state.get("mlflow_experiment_name", mlflow_experiment_name),
             "mlflow_run_name": mlflow_run_name,
+            # Add H2O configuration parameters from state
+            "max_runtime_secs": state.get("max_runtime_secs", 300),
+            "cv_folds": state.get("cv_folds", 5),
+            "balance_classes": state.get("balance_classes", True),
+            "exclude_algos": state.get("exclude_algos", []),
+            "max_models": state.get("max_models", 20),
+            "seed": state.get("seed", 42),
+            "stopping_metric": state.get("stopping_metric", "AUTO"),
+            "stopping_tolerance": state.get("stopping_tolerance", 0.001),
+            "stopping_rounds": state.get("stopping_rounds", 3),
+            "sort_metric": state.get("sort_metric", "AUTO"),
         })
 
         resp = relocate_imports_inside_function(resp)
