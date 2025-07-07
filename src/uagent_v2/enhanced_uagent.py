@@ -139,7 +139,21 @@ class EnhancedDataAnalysisUAgent:
             
             # NEW: Use LLM intent parser to determine query type
             try:
-                intent = self.intent_parser.parse_with_data_preview(query_text, "")
+                # Try to extract CSV URL from query first
+                csv_url = ""
+                try:
+                    extraction_result = self.intent_parser.extract_dataset_url_from_text(query_text)
+                    if extraction_result.extraction_confidence > 0.5:
+                        csv_url = extraction_result.extracted_csv_url
+                except Exception:
+                    pass  # No URL found, continue with empty string
+                
+                # Parse intent (with or without CSV URL)
+                if csv_url:
+                    intent = self.intent_parser.parse_with_data_preview(query_text, csv_url)
+                else:
+                    # Use basic intent parsing without data preview for queries without URLs
+                    intent = self.intent_parser.parse_intent(query_text, "", None)
                 
                 # Handle ML prediction requests
                 if intent.needs_prediction:
@@ -153,12 +167,12 @@ class EnhancedDataAnalysisUAgent:
                 self.logger.warning(f"Intent parsing failed, falling back to keyword detection: {e}")
             
             # Handle follow-up data delivery requests (EXACT pattern from original)
-            if any(phrase in query_lower for phrase in [
-                'send my data', 'provide my cleaned data', 'show me my processed data',
-                'my cleaned dataset', 'give me my data', 'deliver my data',
-                'send rows', 'send columns', 'data in chunks', 'split my data'
-            ]):
-                return self._handle_data_delivery_request(query_text)
+            # if any(phrase in query_lower for phrase in [
+            #     'send my data', 'provide my cleaned data', 'show me my processed data',
+            #     'my cleaned dataset', 'give me my data', 'deliver my data',
+            #     'send rows', 'send columns', 'data in chunks', 'split my data'
+            # ]):
+            #     return self._handle_data_delivery_request(query_text)
             
             # Process the main analysis request (NO HELP DETECTION - like original)
             return self._process_analysis_request(query_text)

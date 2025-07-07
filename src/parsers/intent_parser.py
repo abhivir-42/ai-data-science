@@ -265,6 +265,17 @@ Based on this information, analyze the user's request and provide a structured w
         Returns:
             Dictionary with dataset information
         """
+        # Handle empty or invalid CSV URLs gracefully
+        if not csv_url or csv_url.strip() == "":
+            logger.debug("No CSV URL provided for data preview, using fallback")
+            return {
+                "shape": "Unknown",
+                "columns": [],
+                "dtypes": {},
+                "sample": "No data source provided",
+                "missing_values": {}
+            }
+        
         try:
             # Read the dataset
             df = pd.read_csv(csv_url, nrows=max_rows * 2)  # Read a bit more for sampling
@@ -286,9 +297,9 @@ Based on this information, analyze the user's request and provide a structured w
             return data_info
             
         except Exception as e:
-            logger.error(f"Failed to get data preview: {e}")
+            logger.warning(f"Could not load data preview from {csv_url}: {e}")
             return {
-                "shape": "Unknown",
+                "shape": "Unknown", 
                 "columns": [],
                 "dtypes": {},
                 "sample": "Could not load data preview",

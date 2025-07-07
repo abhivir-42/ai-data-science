@@ -263,10 +263,11 @@ class TestPhase4IntegrationComprehensive:
         }
         
         with patch.object(self.enhanced_uagent.intent_parser, 'parse_with_data_preview', return_value=mock_analysis_intent):
-            with patch.object(MLPredictionAgent, 'analyze_model', return_value=mock_churn_analysis):
-                churn_analysis = self.enhanced_uagent.process_query(
-                    "What are the key factors that drive customer churn?"
-                )
+            with patch.object(self.enhanced_uagent.intent_parser, 'parse_intent', return_value=mock_analysis_intent):
+                with patch.object(MLPredictionAgent, 'analyze_model', return_value=mock_churn_analysis):
+                    churn_analysis = self.enhanced_uagent.process_query(
+                        "What are the key factors that drive customer churn?"
+                    )
         
         # CRITICAL: Churn analysis must provide business insights
         assert "🧠 **MODEL ANALYSIS**" in churn_analysis
