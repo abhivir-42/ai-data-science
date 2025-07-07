@@ -153,7 +153,13 @@ class EnhancedDataAnalysisUAgent:
                     intent = self.intent_parser.parse_with_data_preview(query_text, csv_url)
                 else:
                     # Use basic intent parsing without data preview for queries without URLs
-                    intent = self.intent_parser.parse_intent(query_text, "", None)
+                    # Pass context about existing model to help with prediction detection
+                    model_context = {
+                        "has_trained_model": self._has_trained_model(),
+                        "target_variable": self._last_target_variable,
+                        "model_timestamp": self._last_model_timestamp
+                    }
+                    intent = self.intent_parser.parse_intent(query_text, "", model_context)
                 
                 # Handle ML prediction requests
                 if intent.needs_prediction:
@@ -341,8 +347,8 @@ Sorry, I encountered an issue: {str(error)}
         try:
             return (self._last_trained_model is not None and 
                     not self._is_model_session_expired() and
-                    hasattr(self._last_trained_model, 'model_path') and
-                    self._last_trained_model.model_path is not None)
+                    hasattr(self._last_trained_model, 'best_model_id') and
+                    self._last_trained_model.best_model_id is not None)
         except Exception as e:
             self.logger.warning(f"Error checking model session: {e}")
             return False

@@ -97,6 +97,11 @@ DISTINGUISH TRAINING vs PREDICTION (CRITICAL):
 - "Use the model to predict for new data"
 - "Classify this: Age=30, Income=50000"
 - "Make prediction using https://example.com/new_data.csv"
+- "What would be the tip for a bill of $35 with 4 people?"
+- "Predict tip for total_bill=25.0, size=2"
+- "What's the predicted value for..."
+- "Calculate prediction for..."
+- "Estimate the target for..."
 → User wants to USE an existing model with specific data
 
 🔵 MODEL ANALYSIS (needs_model_analysis=true):
@@ -130,6 +135,13 @@ DATASET INFORMATION:
 - Column Names: {column_names}
 - Data Types: {data_types}
 - Sample Data: {sample_data}
+
+MODEL SESSION CONTEXT:
+- Has Trained Model: {has_trained_model}
+- Target Variable: {target_variable}
+- Model Available: {model_available}
+
+IMPORTANT: If has_trained_model=True and the user mentions values for the target variable or asks "what would be the [target]", this is likely a PREDICTION REQUEST, not a new training request.
 
 Based on this information, analyze the user's request and provide a structured workflow intent analysis.
 
@@ -171,6 +183,9 @@ Based on this information, analyze the user's request and provide a structured w
                     "column_names": data_info.get("columns", []) if data_info else [],
                     "data_types": data_info.get("dtypes", {}) if data_info else {},
                     "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "has_trained_model": data_info.get("has_trained_model", False) if data_info else False,
+                    "target_variable": data_info.get("target_variable", "Unknown") if data_info else "Unknown",
+                    "model_available": data_info.get("has_trained_model", False) if data_info else False,
                     "format_instructions": self.output_parser.get_format_instructions()
                 }
                 
@@ -209,7 +224,7 @@ Based on this information, analyze the user's request and provide a structured w
         Args:
             user_request: Natural language request from user
             csv_url: URL to the CSV file
-            data_info: Dictionary containing dataset information
+            data_info: Dictionary containing dataset information OR model context
             max_retries: Maximum number of retry attempts
             
         Returns:
@@ -227,6 +242,9 @@ Based on this information, analyze the user's request and provide a structured w
                     "column_names": data_info.get("columns", []) if data_info else [],
                     "data_types": data_info.get("dtypes", {}) if data_info else {},
                     "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "has_trained_model": data_info.get("has_trained_model", False) if data_info else False,
+                    "target_variable": data_info.get("target_variable", "Unknown") if data_info else "Unknown",
+                    "model_available": data_info.get("has_trained_model", False) if data_info else False,
                     "format_instructions": self.output_parser.get_format_instructions()
                 }
                 

@@ -826,6 +826,35 @@ def make_feature_engineering_agent(
                 df = df.loc[:, ~df.columns.duplicated()]
                 print(f"✅ Removed duplicate columns. New shape: {df.shape}")
             
+            # CRITICAL: Check if feature engineering failed completely
+            original_data = state.get("data_raw")
+            if original_data and isinstance(original_data, dict):
+                original_df = pd.DataFrame.from_dict(original_data)
+                original_feature_count = len([col for col in original_df.columns if col != target_variable])
+                current_feature_count = len([col for col in df.columns if col != target_variable])
+                
+                print(f"📊 Original features: {original_feature_count}, Current features: {current_feature_count}")
+                
+                # If we lost too many features, this indicates failure
+                if current_feature_count == 0 and original_feature_count > 0:
+                    print(f"🚨 CRITICAL ERROR: All features were dropped! Feature engineering failed.")
+                    print(f"🔧 RECOVERY: Using original data with basic preprocessing")
+                    
+                    # Use original data with basic one-hot encoding
+                    df_recovered = original_df.copy()
+                    
+                    # Apply basic feature engineering
+                    categorical_cols = df_recovered.select_dtypes(include=['object']).columns.tolist()
+                    if target_variable in categorical_cols:
+                        categorical_cols.remove(target_variable)
+                    
+                    if categorical_cols:
+                        print(f"🔧 Applying basic one-hot encoding to: {categorical_cols}")
+                        df_recovered = pd.get_dummies(df_recovered, columns=categorical_cols, drop_first=True)
+                    
+                    df = df_recovered
+                    print(f"✅ RECOVERY SUCCESS: {df.shape} with {len([col for col in df.columns if col != target_variable])} features")
+            
             # CRITICAL: Ensure target column exists if specified
             if target_variable and target_variable not in df.columns:
                 print(f"🚨 CRITICAL ERROR: Target column '{target_variable}' missing from feature engineered data!")
@@ -833,7 +862,6 @@ def make_feature_engineering_agent(
                 
                 # Try to recover by loading original data
                 try:
-                    original_data = state.get("data_raw")
                     if original_data and isinstance(original_data, dict):
                         original_df = pd.DataFrame.from_dict(original_data)
                         if target_variable in original_df.columns:
