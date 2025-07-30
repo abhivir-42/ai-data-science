@@ -727,12 +727,28 @@ def make_feature_engineering_agent(
                 import pandas as pd
                 import numpy as np
                 ...
+                
+                # CRITICAL: Validate target column exists
+                target_col = '{target_variable}'
+                if target_col and target_col not in data_engineered.columns:
+                    if target_col in data_raw.columns:
+                        data_engineered[target_col] = data_raw[target_col]
+                    else:
+                        print(f"WARNING: Target column {{target_col}} not found!")
+                
                 return data_engineered
             
             Best Practices and Error Preventions:
             - Handle missing values in numeric and categorical features before transformations.
             - Avoid creating highly correlated features unless explicitly instructed.
             - Convert Boolean to integer values (0/1) after one-hot encoding unless otherwise instructed.
+            
+            CRITICAL - Target Column Preservation:
+            - NEVER remove or modify the target column: {target_variable}
+            - Always check that the target column exists in the final output
+            - If target column is missing, add it back from the original data
+            - Use unique column names to avoid pandas dropping duplicates
+            - Validate final DataFrame has all required columns before returning
             
             IMPORTANT - Use Modern Sklearn Syntax (v1.6+):
             - Use OneHotEncoder(sparse_output=False) instead of OneHotEncoder(sparse=False)
@@ -747,6 +763,38 @@ def make_feature_engineering_agent(
             - Avoid unescaped backslashes in string literals
             - Use f-strings or .format() for string formatting, not % formatting
             
+            🚨 CRITICAL - Categorical Column Handling:
+            MUST handle pandas categorical columns safely to avoid "Cannot setitem on a Categorical with a new category" errors:
+            
+            ```python
+            # SAFE categorical handling for grouping low-frequency values
+            for col in categorical_columns:
+                if str(data[col].dtype) == 'category':
+                    # Method 1: Convert to object first, then group
+                    data[col] = data[col].astype('object')
+                    
+                    # Now safe to assign new values like 'Other'
+                    value_counts = data[col].value_counts()
+                    low_freq_values = value_counts[value_counts < threshold].index
+                    data[col] = data[col].replace(low_freq_values, 'Other')
+                
+                elif data[col].dtype == 'object':
+                    # Standard string/object columns - safe to assign directly
+                    value_counts = data[col].value_counts()
+                    low_freq_values = value_counts[value_counts < threshold].index
+                    data[col] = data[col].replace(low_freq_values, 'Other')
+            ```
+            
+            Alternative method - Add category first:
+            ```python
+            # Method 2: Add new category then assign
+            if str(data[col].dtype) == 'category':
+                if 'Other' not in data[col].cat.categories:
+                    data[col] = data[col].cat.add_categories(['Other'])
+                # Now safe to assign 'Other'
+                data[col] = data[col].replace(low_freq_values, 'Other')
+            ```
+            
             Avoid the following errors:
             
             - name 'OneHotEncoder' is not defined
@@ -758,6 +806,7 @@ def make_feature_engineering_agent(
             - Shape of passed values is (7043, 48), indices imply (7043, 47)
             - name 'numeric_features' is not defined
             - name 'categorical_features' is not defined
+            - Cannot setitem on a Categorical with a new category (Other), set the categories first
 
 
             """,
@@ -795,6 +844,72 @@ def make_feature_engineering_agent(
         }
 
     def execute_feature_engineering_code(state):
+        def safe_post_processing(df):
+            """Safe post-processing that preserves target column and handles duplicates"""
+            if not isinstance(df, pd.DataFrame):
+                return df
+            
+            target_variable = state.get("target_variable")
+            
+            # Check for duplicate columns
+            if df.columns.duplicated().any():
+                print(f"⚠️  WARNING: Duplicate columns detected: {df.columns[df.columns.duplicated()].tolist()}")
+                
+                # Handle duplicates by keeping only the first occurrence
+                df = df.loc[:, ~df.columns.duplicated()]
+                print(f"✅ Removed duplicate columns. New shape: {df.shape}")
+            
+            # CRITICAL: Check if feature engineering failed completely
+            original_data = state.get("data_raw")
+            if original_data and isinstance(original_data, dict):
+                original_df = pd.DataFrame.from_dict(original_data)
+                original_feature_count = len([col for col in original_df.columns if col != target_variable])
+                current_feature_count = len([col for col in df.columns if col != target_variable])
+                
+                print(f"📊 Original features: {original_feature_count}, Current features: {current_feature_count}")
+                
+                # If we lost too many features, this indicates failure
+                if current_feature_count == 0 and original_feature_count > 0:
+                    print(f"🚨 CRITICAL ERROR: All features were dropped! Feature engineering failed.")
+                    print(f"🔧 RECOVERY: Using original data with basic preprocessing")
+                    
+                    # Use original data with basic one-hot encoding
+                    df_recovered = original_df.copy()
+                    
+                    # Apply basic feature engineering
+                    categorical_cols = df_recovered.select_dtypes(include=['object']).columns.tolist()
+                    if target_variable in categorical_cols:
+                        categorical_cols.remove(target_variable)
+                    
+                    if categorical_cols:
+                        print(f"🔧 Applying basic one-hot encoding to: {categorical_cols}")
+                        df_recovered = pd.get_dummies(df_recovered, columns=categorical_cols, drop_first=True)
+                    
+                    df = df_recovered
+                    print(f"✅ RECOVERY SUCCESS: {df.shape} with {len([col for col in df.columns if col != target_variable])} features")
+            
+            # CRITICAL: Ensure target column exists if specified
+            if target_variable and target_variable not in df.columns:
+                print(f"🚨 CRITICAL ERROR: Target column '{target_variable}' missing from feature engineered data!")
+                print(f"   Available columns: {list(df.columns)}")
+                
+                # Try to recover by loading original data
+                try:
+                    if original_data and isinstance(original_data, dict):
+                        original_df = pd.DataFrame.from_dict(original_data)
+                        if target_variable in original_df.columns:
+                            print(f"🔧 RECOVERY: Adding target column '{target_variable}' from original data")
+                            df[target_variable] = original_df[target_variable]
+                        else:
+                            print(f"❌ RECOVERY FAILED: Target '{target_variable}' not in original data either")
+                except Exception as e:
+                    print(f"❌ RECOVERY FAILED: {e}")
+            
+            print(f"✅ Final feature engineered data shape: {df.shape}")
+            print(f"✅ Final columns: {list(df.columns)}")
+            
+            return df.to_dict()
+        
         return node_func_execute_agent_code_on_data(
             state=state,
             data_key="data_raw",
@@ -803,7 +918,7 @@ def make_feature_engineering_agent(
             code_snippet_key="feature_engineer_function",
             agent_function_name=state.get("feature_engineer_function_name"),
             pre_processing=lambda data: pd.DataFrame.from_dict(data),
-            post_processing=lambda df: df.to_dict() if isinstance(df, pd.DataFrame) else df,
+            post_processing=safe_post_processing,
             error_message_prefix="An error occurred during feature engineering: "
         )
 

@@ -536,14 +536,36 @@ class DataAnalysisAgent:
                 request, intent, data_path, target_variable
             )
             
-            # Execute agent
+            # Execute agent with all mapped parameters
             logger.info("Executing H2O ML agent...")
-            result_dict = self.h2o_ml_agent.invoke_agent(
-                data_raw=data_df,
-                user_instructions=params["user_instructions"],
-                target_variable=target_variable,
-                max_retries=3
-            )
+            
+            # Pass all H2O-specific parameters from the mapper
+            h2o_params = {
+                "data_raw": data_df,
+                "user_instructions": params["user_instructions"],
+                "target_variable": target_variable,
+                "max_retries": 3,
+                # Add H2O-specific parameters
+                "max_runtime_secs": params.get("max_runtime_secs", 300),
+                "model_directory": params.get("model_directory"),
+                "enable_mlflow": params.get("enable_mlflow", False),
+                "mlflow_tracking_uri": params.get("mlflow_tracking_uri"),
+                "mlflow_experiment_name": params.get("mlflow_experiment_name"),
+                "problem_type": params.get("problem_type", "auto"),
+                "cv_folds": params.get("cv_folds", 5),
+                "balance_classes": True,  # Good default for imbalanced data
+                "exclude_algos": [],  # Don't exclude any algorithms
+                "max_models": 20,  # Train multiple models
+                "seed": 42,  # Reproducibility
+                "stopping_metric": "AUTO",  # Let H2O decide based on problem type
+                "stopping_tolerance": 0.001,
+                "stopping_rounds": 3,
+                "sort_metric": "AUTO"  # Let H2O decide based on problem type
+            }
+            
+            logger.info(f"H2O ML parameters: runtime={h2o_params['max_runtime_secs']}s, problem_type={h2o_params['problem_type']}")
+            
+            result_dict = self.h2o_ml_agent.invoke_agent(**h2o_params)
             result_str = str(result_dict)
             
             # Calculate execution time first

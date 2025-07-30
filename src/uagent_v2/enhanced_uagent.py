@@ -89,6 +89,10 @@ class EnhancedDataAnalysisUAgent:
         self.response_builder = ResponseBuilder(self.config)
         self.error_builder = ErrorResponseBuilder(self.config)
         
+        # NEW: Initialize prediction formatter
+        from .prediction_formatters import PredictionResponseFormatter
+        self.prediction_formatter = PredictionResponseFormatter(self.config)
+        
         # Initialize the underlying data analysis agent
         self.data_analysis_agent = DataAnalysisAgent(
             output_dir=self.config.output_dir,
@@ -99,6 +103,16 @@ class EnhancedDataAnalysisUAgent:
         # Session management
         self._last_cleaned_data = None
         self._last_processed_timestamp = None
+        
+        # NEW: ML model session management  
+        self._last_trained_model = None          # MLModelingMetrics object from successful ML training
+        self._last_model_timestamp = None        # When model was trained
+        self._last_training_result = None        # AgentExecutionResult with ML metrics
+        self._last_target_variable = None        # Target variable used for training
+        
+        # NEW: Initialize intent parser for prediction recognition
+        from src.parsers.intent_parser import DataAnalysisIntentParser
+        self.intent_parser = DataAnalysisIntentParser(self.config.intent_parser_model)
         
         self.logger.info(f"Enhanced uAgent initialized with config: {self.config.to_dict()}")
     
@@ -123,13 +137,48 @@ class EnhancedDataAnalysisUAgent:
             
             query_lower = query_text.lower()
             
+            # NEW: Use LLM intent parser to determine query type
+            try:
+                # Try to extract CSV URL from query first
+                csv_url = ""
+                try:
+                    extraction_result = self.intent_parser.extract_dataset_url_from_text(query_text)
+                    if extraction_result.extraction_confidence > 0.5:
+                        csv_url = extraction_result.extracted_csv_url
+                except Exception:
+                    pass  # No URL found, continue with empty string
+                
+                # Parse intent (with or without CSV URL)
+                if csv_url:
+                    intent = self.intent_parser.parse_with_data_preview(query_text, csv_url)
+                else:
+                    # Use basic intent parsing without data preview for queries without URLs
+                    # Pass context about existing model to help with prediction detection
+                    model_context = {
+                        "has_trained_model": self._has_trained_model(),
+                        "target_variable": self._last_target_variable,
+                        "model_timestamp": self._last_model_timestamp
+                    }
+                    intent = self.intent_parser.parse_intent(query_text, "", model_context)
+                
+                # Handle ML prediction requests
+                if intent.needs_prediction:
+                    return self._handle_prediction_request(query_text, intent)
+                
+                # Handle model analysis questions
+                if intent.needs_model_analysis:
+                    return self._handle_model_analysis_request(query_text, intent)
+                    
+            except Exception as e:
+                self.logger.warning(f"Intent parsing failed, falling back to keyword detection: {e}")
+            
             # Handle follow-up data delivery requests (EXACT pattern from original)
-            if any(phrase in query_lower for phrase in [
-                'send my data', 'provide my cleaned data', 'show me my processed data',
-                'my cleaned dataset', 'give me my data', 'deliver my data',
-                'send rows', 'send columns', 'data in chunks', 'split my data'
-            ]):
-                return self._handle_data_delivery_request(query_text)
+            # if any(phrase in query_lower for phrase in [
+            #     'send my data', 'provide my cleaned data', 'show me my processed data',
+            #     'my cleaned dataset', 'give me my data', 'deliver my data',
+            #     'send rows', 'send columns', 'data in chunks', 'split my data'
+            # ]):
+            #     return self._handle_data_delivery_request(query_text)
             
             # Process the main analysis request (NO HELP DETECTION - like original)
             return self._process_analysis_request(query_text)
@@ -173,6 +222,72 @@ Sorry, I encountered an issue: {str(error)}
             self.logger.error(f"Data delivery failed: {e}", exc_info=True)
             return self.error_builder.build_generic_error_response(e, "data delivery")
     
+    def _handle_prediction_request(self, query: str, intent) -> str:
+        """Handle prediction requests using trained model."""
+        try:
+            # Check if we have a trained model
+            if not self._has_trained_model():
+                return self.prediction_formatter.format_no_model_response()
+            
+            # Create prediction agent
+            from src.agents.ml_prediction_agent import MLPredictionAgent
+            prediction_agent = MLPredictionAgent(
+                self._last_trained_model, 
+                self._last_target_variable, 
+                self.config
+            )
+            
+            # Execute prediction based on intent
+            if intent.prediction_type == "single_prediction":
+                if not intent.extracted_prediction_data:
+                    return self.prediction_formatter.format_prediction_error_response(
+                        Exception("No prediction data found. Please provide input values like: Age=25, Sex=male")
+                    )
+                
+                result = prediction_agent.predict_single(intent.extracted_prediction_data)
+                return self.prediction_formatter.format_single_prediction(result)
+                
+            elif intent.prediction_type == "batch_prediction":
+                if not intent.prediction_data_source:
+                    return self.prediction_formatter.format_prediction_error_response(
+                        Exception("No CSV URL found. Please provide a CSV URL for batch prediction")
+                    )
+                
+                result = prediction_agent.predict_batch(intent.prediction_data_source)
+                return self.prediction_formatter.format_batch_prediction(result)
+                
+            else:
+                return self.prediction_formatter.format_prediction_error_response(
+                    Exception("Could not understand the prediction request type")
+                )
+                
+        except Exception as e:
+            self.logger.error(f"Prediction request failed: {e}")
+            return self.prediction_formatter.format_prediction_error_response(e)
+
+    def _handle_model_analysis_request(self, query: str, intent) -> str:
+        """Handle model analysis questions."""
+        try:
+            # Check if we have a trained model
+            if not self._has_trained_model():
+                return self.prediction_formatter.format_no_model_response()
+            
+            # Create prediction agent for analysis
+            from src.agents.ml_prediction_agent import MLPredictionAgent
+            prediction_agent = MLPredictionAgent(
+                self._last_trained_model, 
+                self._last_target_variable, 
+                self.config
+            )
+            
+            # Analyze model
+            result = prediction_agent.analyze_model(query)
+            return self.prediction_formatter.format_model_analysis(result)
+            
+        except Exception as e:
+            self.logger.error(f"Model analysis failed: {e}")
+            return self.prediction_formatter.format_prediction_error_response(e)
+    
     def _process_analysis_request(self, query: str) -> str:
         """Process the main data analysis request following the original pattern."""
         try:
@@ -181,6 +296,9 @@ Sorry, I encountered an issue: {str(error)}
             
             # Store cleaned data for potential follow-up requests (same as original)
             self._store_cleaned_data_if_available()
+            
+            # NEW: Store ML model for potential predictions
+            self._store_ml_model_if_available(result)
             
             # Format the structured result for uAgent compatibility (same as original)
             return self.result_formatter.format_analysis_result_enhanced(result)
@@ -223,6 +341,76 @@ Sorry, I encountered an issue: {str(error)}
             self._last_cleaned_data = None
             self._last_processed_timestamp = None
             self.logger.info("Session data cleaned up due to expiration")
+    
+    def _has_trained_model(self) -> bool:
+        """Check if we have a valid trained model in session."""
+        try:
+            return (self._last_trained_model is not None and 
+                    not self._is_model_session_expired() and
+                    hasattr(self._last_trained_model, 'best_model_id') and
+                    self._last_trained_model.best_model_id is not None)
+        except Exception as e:
+            self.logger.warning(f"Error checking model session: {e}")
+            return False
+    
+    def _is_model_session_expired(self) -> bool:
+        """Check if the ML model session has expired."""
+        try:
+            if not self._last_model_timestamp:
+                return True
+            
+            # Handle corrupted timestamp data
+            if not isinstance(self._last_model_timestamp, (int, float)):
+                self.logger.warning(f"Invalid timestamp type: {type(self._last_model_timestamp)}")
+                return True
+            
+            session_age = time.time() - self._last_model_timestamp
+            max_age = self.config.session_timeout_hours * 3600
+            return session_age > max_age
+        except Exception as e:
+            self.logger.warning(f"Error checking session expiration: {e}")
+            return True  # Safe default: assume expired
+    
+    def _store_ml_model_if_available(self, result):
+        """Store trained ML model information for follow-up predictions."""
+        try:
+            # Find ML agent result
+            ml_agent_result = None
+            for agent_result in result.agent_results:
+                if agent_result.agent_name == "h2o_ml" and agent_result.success:
+                    ml_agent_result = agent_result
+                    break
+            
+            if ml_agent_result and ml_agent_result.ml_modeling_metrics:
+                metrics = ml_agent_result.ml_modeling_metrics
+                
+                # Store the existing MLModelingMetrics directly (no new schema needed!)
+                self._last_trained_model = metrics
+                self._last_model_timestamp = time.time()
+                self._last_training_result = ml_agent_result
+                self._last_target_variable = self._extract_target_variable(result)
+                
+                self.logger.info(f"Stored trained model session: {metrics.best_model_id}")
+                self.logger.info(f"Model path: {metrics.model_path}")
+                self.logger.info(f"Target variable: {self._last_target_variable}")
+                
+        except Exception as e:
+            self.logger.warning(f"Could not store ML model session: {e}")
+    
+    def _extract_target_variable(self, result) -> Optional[str]:
+        """Extract target variable from the analysis result."""
+        # Try workflow intent first
+        if result.workflow_intent.suggested_target_variable:
+            return result.workflow_intent.suggested_target_variable
+        
+        # Try to find from ML agent execution logs
+        for agent_result in result.agent_results:
+            if agent_result.agent_name == "h2o_ml" and agent_result.success:
+                # Target variable might be in log messages or metadata
+                # This would need to be extracted from the actual agent execution
+                pass
+        
+        return None
 
 
 def create_enhanced_uagent_function(config: Optional[UAgentConfig] = None):

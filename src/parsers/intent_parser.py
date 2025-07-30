@@ -66,6 +66,7 @@ class DataAnalysisIntentParser:
 You will be given:
 1. A user's natural language request for data analysis
 2. Basic information about their dataset (columns, data types, shape)
+3. Current model session context (whether a model exists)
 
 Your job is to intelligently determine:
 - What data analysis steps are needed (cleaning, feature engineering, ML modeling)
@@ -76,10 +77,90 @@ Your job is to intelligently determine:
 CRITICAL PARSING RULES:
 - ONLY set needs_data_cleaning=true if the user explicitly mentions cleaning, preprocessing, data quality, missing values, duplicates, or outliers
 - ONLY set needs_feature_engineering=true if the user explicitly mentions features, encoding, transformations, or feature creation
-- ONLY set needs_ml_modeling=true if the user explicitly mentions prediction, modeling, classification, regression, or machine learning
+- ONLY set needs_ml_modeling=true if the user wants to TRAIN/BUILD/CREATE a new model
+- ONLY set needs_prediction=true if user wants to USE an existing model to predict on new data
+- ONLY set needs_model_analysis=true if user asks questions about model performance, feature importance, or model insights
 - Be PRECISE and LITERAL in your interpretation - don't assume additional steps unless explicitly requested
 - If the user only asks for cleaning, do NOT assume they want feature engineering or ML
 - If the user only asks for ML, then yes, they likely need cleaning and feature engineering as prerequisites
+
+DISTINGUISH TRAINING vs PREDICTION (CRITICAL):
+
+🔴 MODEL TRAINING (needs_ml_modeling=true, needs_prediction=false):
+- "Train a model", "Build a model", "Create ML model"
+- "Clean and build ML model to predict survival" 
+- "Develop a classification model"
+- "Train machine learning algorithm"
+- "Create/build/train/develop/make a {{model/classifier/predictor}}"
+- "I want to train on {{dataset}}"
+- "Learn from this data"
+- "Build ML algorithm"
+→ User wants to CREATE a new model
+
+🟢 PREDICTION WITH EXISTING MODEL (needs_prediction=true, needs_ml_modeling=false):
+**STRONG PREDICTION INDICATORS:**
+- Contains specific values: "Age=25, Sex=male, Pclass=3"
+- Question format: "What would be the {{target}} for...?"
+- Imperative: "Predict {{target}} for..."
+- Calculation: "Calculate {{target}} for..."
+- Estimation: "Estimate {{target}} for..."
+- Assessment: "What's the {{target}} if..."
+- Scenario: "For someone with {{features}}, what would {{target}} be?"
+
+**PREDICTION PATTERNS:**
+- "Predict survival for Age=25, Sex=male, Pclass=3"
+- "What would be the tip for a bill of $35 with 4 people?"
+- "Predict tip for total_bill=25.0, size=2"
+- "What's the predicted house price for rooms=6, {{age}}=50?"
+- "Calculate diabetes risk for Glucose=148, BMI=33.6, {{Age}}=50"
+- "Estimate wine quality for alcohol=12.5, acidity=0.7"
+- "What's the MPG for cylinders=4, horsepower=85, weight=2500?"
+- "For a customer with tenure=12, MonthlyCharges=70, will they churn?"
+- "Assess fraud risk for Amount=149.62, V1=-1.5, V2=2.3"
+- "What grade would a student get with studytime=3, failures=0?"
+- "Predict fuel efficiency for a car with 4 cylinders, 100hp"
+- "What salary for 5 years experience, Master's degree?"
+- "Air quality prediction for temp=25, humidity=60, wind=10"
+
+**CONTEXT-AWARE PREDICTION DETECTION:**
+- If has_trained_model=True AND user provides feature values → PREDICTION (99% confidence)
+- If has_trained_model=True AND user asks "what would be X" → PREDICTION (95% confidence)
+- If has_trained_model=True AND user mentions target variable → PREDICTION (90% confidence)
+- If has_trained_model=False AND user provides feature values → Still PREDICTION (attempt with existing model)
+
+**BATCH PREDICTION:**
+- "Use the model to predict for new data"
+- "Classify this CSV: https://example.com/new_data.csv"
+- "Make predictions using https://example.com/test_data.csv"
+- "Predict for batch of customers"
+- "Apply model to new dataset"
+→ User wants to USE an existing model with batch data
+
+🔵 MODEL ANALYSIS (needs_model_analysis=true):
+- "What features are most important?"
+- "Why did the model predict this?"
+- "How well does the model perform?"
+- "What's the model accuracy?"
+- "Analyze model performance"
+- "Feature importance analysis"
+- "Model evaluation metrics"
+- "What drives the predictions?"
+- "How good is the model?"
+- "Model insights and interpretation"
+→ User wants to ANALYZE an existing model
+
+ENHANCED PREDICTION DATA EXTRACTION:
+- For single prediction: extract ALL inline data like {{age}}=25, {{sex}}=male into extracted_prediction_data
+- Parse natural language: "35 year old male in first class" → {{{{age: 35, sex: male, pclass: 1}}}}
+- Handle ranges: "bill between $20-30" → use midpoint or ask for clarification
+- For batch prediction: extract CSV URLs and set prediction_data_source
+- Set prediction_type: "single_prediction", "batch_prediction", or "model_analysis"
+
+AMBIGUITY RESOLUTION:
+- If unclear between training/prediction: favor PREDICTION if has_trained_model=True
+- If user provides values but unclear intent: favor PREDICTION
+- If user mentions both training and prediction: favor TRAINING (they want to retrain)
+- If completely ambiguous: set lower confidence (0.3-0.5) and choose most likely
 
 RESPONSE REQUIREMENTS:
 - You MUST respond with valid JSON that matches the exact schema provided
@@ -91,7 +172,10 @@ RESPONSE REQUIREMENTS:
 EXAMPLES:
 - "Clean the dataset" → needs_data_cleaning=true, needs_feature_engineering=false, needs_ml_modeling=false
 - "Build a model to predict X" → needs_data_cleaning=true, needs_feature_engineering=true, needs_ml_modeling=true
-- "Engineer features for the data" → needs_data_cleaning=false, needs_feature_engineering=true, needs_ml_modeling=false"""
+- "Engineer features for the data" → needs_data_cleaning=false, needs_feature_engineering=true, needs_ml_modeling=false
+- "What would be the tip for bill=$35, size=4?" → needs_prediction=true, prediction_type="single_prediction"
+- "Predict house price for rooms=6, age=50" → needs_prediction=true, prediction_type="single_prediction"
+- "How accurate is the model?" → needs_model_analysis=true"""
 
         user_prompt = """USER REQUEST: {user_request}
 
@@ -101,6 +185,13 @@ DATASET INFORMATION:
 - Column Names: {column_names}
 - Data Types: {data_types}
 - Sample Data: {sample_data}
+
+MODEL SESSION CONTEXT:
+- Has Trained Model: {has_trained_model}
+- Target Variable: {target_variable}
+- Model Available: {model_available}
+
+IMPORTANT: If has_trained_model=True and the user mentions values for the target variable or asks "what would be the {{target}}", this is likely a PREDICTION REQUEST, not a new training request.
 
 Based on this information, analyze the user's request and provide a structured workflow intent analysis.
 
@@ -142,6 +233,9 @@ Based on this information, analyze the user's request and provide a structured w
                     "column_names": data_info.get("columns", []) if data_info else [],
                     "data_types": data_info.get("dtypes", {}) if data_info else {},
                     "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "has_trained_model": data_info.get("has_trained_model", False) if data_info else False,
+                    "target_variable": data_info.get("target_variable", "Unknown") if data_info else "Unknown",
+                    "model_available": data_info.get("has_trained_model", False) if data_info else False,
                     "format_instructions": self.output_parser.get_format_instructions()
                 }
                 
@@ -180,7 +274,7 @@ Based on this information, analyze the user's request and provide a structured w
         Args:
             user_request: Natural language request from user
             csv_url: URL to the CSV file
-            data_info: Dictionary containing dataset information
+            data_info: Dictionary containing dataset information OR model context
             max_retries: Maximum number of retry attempts
             
         Returns:
@@ -198,6 +292,9 @@ Based on this information, analyze the user's request and provide a structured w
                     "column_names": data_info.get("columns", []) if data_info else [],
                     "data_types": data_info.get("dtypes", {}) if data_info else {},
                     "sample_data": data_info.get("sample", "Not available") if data_info else "Not available",
+                    "has_trained_model": data_info.get("has_trained_model", False) if data_info else False,
+                    "target_variable": data_info.get("target_variable", "Unknown") if data_info else "Unknown",
+                    "model_available": data_info.get("has_trained_model", False) if data_info else False,
                     "format_instructions": self.output_parser.get_format_instructions()
                 }
                 
@@ -236,6 +333,17 @@ Based on this information, analyze the user's request and provide a structured w
         Returns:
             Dictionary with dataset information
         """
+        # Handle empty or invalid CSV URLs gracefully
+        if not csv_url or csv_url.strip() == "":
+            logger.debug("No CSV URL provided for data preview, using fallback")
+            return {
+                "shape": "Unknown",
+                "columns": [],
+                "dtypes": {},
+                "sample": "No data source provided",
+                "missing_values": {}
+            }
+        
         try:
             # Read the dataset
             df = pd.read_csv(csv_url, nrows=max_rows * 2)  # Read a bit more for sampling
@@ -257,9 +365,9 @@ Based on this information, analyze the user's request and provide a structured w
             return data_info
             
         except Exception as e:
-            logger.error(f"Failed to get data preview: {e}")
+            logger.warning(f"Could not load data preview from {csv_url}: {e}")
             return {
-                "shape": "Unknown",
+                "shape": "Unknown", 
                 "columns": [],
                 "dtypes": {},
                 "sample": "Could not load data preview",
